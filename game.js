@@ -447,3 +447,303 @@ function setup(){
   setTimeout(()=>{$("#loadingScreen")?.classList.add("hidden");if(state.userId&&currentUser())enterApp();else leaveApp()},350);
 }
 document.readyState==="loading"?document.addEventListener("DOMContentLoaded",setup):setup();
+/* ================================================================
+   NOBODY 2.0 EXTENSION
+   Additive feature layer. Existing features remain available.
+================================================================ */
+(function NobodyV20(){
+  const VERSION = "nobody_local_v5";
+  const MAX_IMAGE_BYTES = 6 * 1024 * 1024;
+  const MAX_STORED_IMAGE_BYTES = 700 * 1024;
+  const THEME_KEY_V20 = "nobody_theme_v5";
+
+  function ensureData(){
+    state.db = state.db || {};
+    const d = state.db;
+    if(!Array.isArray(d.users)) d.users=[];
+    if(!Array.isArray(d.posts)) d.posts=[];
+    if(!Array.isArray(d.likes)) d.likes=[];
+    if(!Array.isArray(d.messages)) d.messages=[];
+    if(!Array.isArray(d.rooms)) d.rooms=[];
+    if(!Array.isArray(d.comments)) d.comments=[];
+    if(!Array.isArray(d.reputation)) d.reputation=[];
+    if(!Array.isArray(d.reports)) d.reports=[];
+    if(!Array.isArray(d.games)) d.games=[];
+    if(!Array.isArray(d.friendships)) d.friendships=[];
+    if(!Array.isArray(d.notifications)) d.notifications=[];
+    if(!Array.isArray(d.moderationLogs)) d.moderationLogs=[];
+    if(!d.profilePhotos || typeof d.profilePhotos !== "object") d.profilePhotos={};
+    if(!d.postImages || typeof d.postImages !== "object") d.postImages={};
+    d.users.forEach(u=>{
+      if(!u.role) u.role=OWNER_USERNAMES.has(String(u.username||"").toLowerCase())?"owner":"user";
+      if(!u.bio) u.bio="";
+      if(!u.anonymousId) u.anonymousId=anonymousId(u);
+      if(!u.privacy) u.privacy={showID:true,allowMessages:true,showRoom:true};
+      if(!u.room) u.room={name:"Моя комната",description:"Добро пожаловать в мою комнату.",style:"mint",visits:true,participants:[],game:null};
+      if(!Array.isArray(u.room.participants)) u.room.participants=[];
+      if(!Array.isArray(u.room.photos)) u.room.photos=[];
+    });
+    d.posts.forEach(p=>{if(!Number.isFinite(p.comments)) p.comments=d.comments.filter(c=>c.postId===p.id).length});
+  }
+
+  const baseSaveDB=saveDB;
+  saveDB=function(){
+    try { baseSaveDB(); return true; }
+    catch(error){ console.error("NOBODY storage error",error); toast("Не хватило места в хранилище. Удали несколько фото и попробуй снова."); return false; }
+  };
+  function save(){ ensureData(); return saveDB(); }
+  function ownerOnly(){ return isOwner(); }
+  function userById(id){ return getUser(id); }
+  function reputationFor(userId){
+    const rows=state.db.reputation.filter(r=>r.targetId===userId);
+    return {likes:rows.filter(r=>r.value===1).length, dislikes:rows.filter(r=>r.value===-1).length, score:rows.reduce((n,r)=>n+r.value,0), mine:rows.find(r=>r.fromId===state.userId)?.value||0};
+  }
+  function imageMarkup(src, cls="profile-photo"){
+    return src ? `<img class="${cls}" src="${escapeHTML(src)}" alt="Фото">` : "";
+  }
+  function readImage(file, cb){
+    if(!file) return;
+    if(!file.type.startsWith("image/")) return toast("Можно загрузить только изображение.");
+    if(file.size>MAX_IMAGE_BYTES) return toast("Фото слишком большое. Максимум 6 МБ.");
+    const reader=new FileReader();
+    reader.onload=()=>{
+      const img=new Image();
+      img.onload=()=>{
+        const max=1200, scale=Math.min(1,max/Math.max(img.width,img.height));
+        const canvas=document.createElement("canvas");canvas.width=Math.max(1,Math.round(img.width*scale));canvas.height=Math.max(1,Math.round(img.height*scale));
+        const ctx=canvas.getContext("2d");ctx.drawImage(img,0,0,canvas.width,canvas.height);
+        let out=canvas.toDataURL("image/jpeg",.82);
+        // A conservative second pass keeps localStorage from being filled by camera originals.
+        if(out.length>MAX_STORED_IMAGE_BYTES*1.37){out=canvas.toDataURL("image/jpeg",.68)}
+        cb(out);
+      };
+      img.onerror=()=>toast("Не удалось обработать фото.");img.src=String(reader.result);
+    };
+    reader.onerror=()=>toast("Не удалось прочитать фото.");
+    reader.readAsDataURL(file);
+  }
+
+  /* Theme: SEA SAND / MIDNIGHT SKY */
+  function applyV20Theme(theme){
+    state.theme=theme; localStorage.setItem(THEME_KEY_V20,theme); localStorage.setItem(THEME_KEY,theme);
+    const dark=theme==="dark" || (theme==="system" && window.matchMedia?.("(prefers-color-scheme: dark)").matches);
+    document.body.classList.toggle("dark",dark);
+    document.body.dataset.theme=dark?"midnight":"seasand";
+    const select=$("#themeSelect"); if(select) select.value=theme;
+  }
+
+  /* Profile + reputation */
+  function renderReputation(user){
+    const r=reputationFor(user.id);
+    return `<div class="reputation-card"><div><span>Репутация</span><strong>${r.score>0?"+":""}${r.score}</strong></div><button class="rep-btn ${r.mine===1?"active":""}" data-rep="1" data-rep-user="${escapeHTML(user.id)}" type="button">👍 ${r.likes}</button><button class="rep-btn ${r.mine===-1?"active":""}" data-rep="-1" data-rep-user="${escapeHTML(user.id)}" type="button">👎 ${r.dislikes}</button></div>`;
+  }
+  function renderGallery(user, own=false){
+    const photos=state.db.profilePhotos[user.id]||[];
+    const box=$("#profileGallery"); if(!box)return;
+    box.innerHTML=`<div class="gallery-head"><div><span class="eyebrow">GALLERY</span><h2>Фото</h2></div>${own?`<label class="secondary-button upload-button" for="galleryInput">＋ Добавить</label><input id="galleryInput" class="file-input" type="file" accept="image/*">`:``}</div>${photos.length?`<div class="gallery-grid">${photos.map((src,i)=>`<div class="gallery-item">${imageMarkup(src,"gallery-image")}${own?`<button class="gallery-delete" data-gallery-delete="${i}" type="button">×</button>`:""}</div>`).join("")}</div>`:`<div class="empty-state compact"><strong>Фотографий пока нет</strong><p>${own?"Добавь первое фото в свой профиль.":"Пользователь ещё не добавил фото."}</p></div>`}`;
+    box.querySelector("#galleryInput")?.addEventListener("change",e=>{
+      readImage(e.target.files?.[0],src=>{if(!state.db.profilePhotos[user.id])state.db.profilePhotos[user.id]=[];if(state.db.profilePhotos[user.id].length>=6)return toast("В галерее максимум 6 фото.");state.db.profilePhotos[user.id].push(src);save();renderGallery(user,own);toast("Фото добавлено 📸","success")});
+    });
+    box.querySelectorAll("[data-gallery-delete]").forEach(b=>b.onclick=()=>{const i=Number(b.dataset.galleryDelete);state.db.profilePhotos[user.id].splice(i,1);save();renderGallery(user,own);toast("Фото удалено.","success")});
+  }
+  function enhancedProfile(u, own){
+    if(!u)return;
+    const r=reputationFor(u.id);
+    const photos=state.db.profilePhotos[u.id]||[];
+    const avatarSrc=photos[0]||u.avatarImage||"";
+    const avatar=avatarSrc?imageMarkup(avatarSrc,"avatar-image"):initials(u);
+    const actions=own?`<button class="secondary-button" id="profileInlineEdit" type="button">Редактировать</button>`:`<button class="primary-button" id="profileMessageButton" type="button">Написать</button>`;
+    $("#profileCard").innerHTML=`<div class="profile-avatar avatar large ${avatarSrc?"photo-avatar":""}">${avatar}</div><div class="profile-main"><div class="profile-name-row"><div><h1>${escapeHTML(u.displayName||u.username)}</h1><p>@${escapeHTML(u.username)}</p></div>${actions}</div><p class="profile-bio">${escapeHTML(u.bio||"Этот nobody пока ничего о себе не рассказал.")}</p><span class="profile-id">${escapeHTML(u.anonymousId)}</span>${renderReputation(u)}</div>`;
+    $("#profileInfo").innerHTML=`<div><span>Ник</span><strong>@${escapeHTML(u.username)}</strong></div><div><span>👍</span><strong>${r.likes}</strong></div><div><span>👎</span><strong>${r.dislikes}</strong></div><div><span>В NOBODY с</span><strong>${new Date(u.createdAt).toLocaleDateString("ru-RU")}</strong></div>`;
+    $("#profileInlineEdit")?.addEventListener("click",openProfileEditor);
+    $("#profileMessageButton")?.addEventListener("click",()=>{navigate("messages");openChat(u.id)});
+    $("#profileCard").querySelectorAll("[data-rep]").forEach(b=>b.onclick=()=>rateUser(b.dataset.repUser,Number(b.dataset.rep)));
+    renderGallery(u,own);
+  }
+  function rateUser(targetId,value){
+    if(targetId===state.userId)return toast("Себе репутацию менять нельзя.");
+    const idx=state.db.reputation.findIndex(r=>r.targetId===targetId&&r.fromId===state.userId);
+    if(idx>=0){ if(state.db.reputation[idx].value===value)state.db.reputation.splice(idx,1); else state.db.reputation[idx].value=value; }
+    else state.db.reputation.push({id:uid("rep"),targetId,fromId:state.userId,value,createdAt:now()});
+    save();
+    const u=getUser(targetId); if(u?.id===state.userId)loadProfile(); else openUserProfile(targetId);
+  }
+
+  /* Comments */
+  function postComments(postId){return state.db.comments.filter(c=>c.postId===postId).sort((a,b)=>new Date(a.createdAt)-new Date(b.createdAt));}
+  function renderComments(postId){
+    const list=$("#commentsList");if(!list)return;
+    const comments=postComments(postId);
+    list.innerHTML=comments.length?comments.map(c=>{const u=getUser(c.authorId);return `<div class="comment-row"><div class="avatar">${initials(u)}</div><div class="comment-main"><strong>@${escapeHTML(u?.username||"unknown")}</strong><p>${escapeHTML(c.text).replaceAll("\n","<br>")}</p><time>${escapeHTML(formatDate(c.createdAt))}</time></div>${c.authorId===state.userId||isOwner()?`<button class="icon-button comment-delete" data-delete-comment="${escapeHTML(c.id)}" type="button">×</button>`:""}</div>`}).join(""):`<div class="empty-state compact"><strong>Комментариев пока нет</strong><p>Будь первым.</p></div>`;
+    list.querySelectorAll("[data-delete-comment]").forEach(b=>b.onclick=()=>deleteComment(b.dataset.deleteComment,postId));
+  }
+  function openComments(postId){
+    const modal=$("#commentsModal");if(!modal)return;
+    modal.dataset.postId=postId; renderComments(postId); openModal("commentsModal"); setTimeout(()=>$("#commentInput")?.focus(),50);
+  }
+  function submitComment(e){
+    e.preventDefault(); const input=$("#commentInput"),postId=$("#commentsModal")?.dataset.postId,text=input?.value.trim();
+    if(!postId||!text)return;
+    state.db.comments.push({id:uid("comment"),postId,authorId:state.userId,text,createdAt:now()});
+    const p=state.db.posts.find(x=>x.id===postId);if(p)p.comments=postComments(postId).length;
+    save();input.value="";renderComments(postId);loadFeed();
+  }
+  function deleteComment(id,postId){
+    state.db.comments=state.db.comments.filter(c=>c.id!==id);const p=state.db.posts.find(x=>x.id===postId);if(p)p.comments=postComments(postId).length;save();renderComments(postId);loadFeed();toast("Комментарий удалён.","success");
+  }
+
+  /* Messages + owner moderation viewer */
+  function renderOwnerChatViewer(){
+    const select=$("#ownerChatSelect"), viewer=$("#ownerChatViewer");if(!select||!viewer)return;
+    if(!ownerOnly()){select.innerHTML="<option>Доступ закрыт</option>";viewer.innerHTML="";return}
+    const pairs=new Map();
+    state.db.messages.forEach(m=>{const ids=[m.from,m.to].sort();const key=ids.join("|");if(!pairs.has(key))pairs.set(key,{a:ids[0],b:ids[1],count:0,last:m});const x=pairs.get(key);x.count++;if(new Date(m.createdAt)>new Date(x.last.createdAt))x.last=m});
+    const chats=[...pairs.values()].sort((a,b)=>new Date(b.last.createdAt)-new Date(a.last.createdAt));
+    const current=select.value;
+    select.innerHTML=`<option value="">Выбери чат (${chats.length})</option>`+chats.map(c=>{const a=getUser(c.a),b=getUser(c.b);return `<option value="${escapeHTML(c.a+"|"+c.b)}">@${escapeHTML(a?.username||"?")} ↔ @${escapeHTML(b?.username||"?")} · ${c.count}</option>`}).join("");
+    if(chats.some(c=>c.a+"|"+c.b===current))select.value=current;
+    const key=select.value;if(!key){viewer.innerHTML=`<div class="empty-state compact"><strong>Выбери переписку</strong><p>Все сохранённые личные сообщения доступны владельцу для модерации.</p></div>`;return}
+    const ids=key.split("|");const list=state.db.messages.filter(m=>(ids.includes(m.from)&&ids.includes(m.to))).sort((a,b)=>new Date(a.createdAt)-new Date(b.createdAt));
+    viewer.innerHTML=`<div class="owner-viewer-head"><strong>@${escapeHTML(getUser(ids[0])?.username||"?")} ↔ @${escapeHTML(getUser(ids[1])?.username||"?")}</strong><span>${list.length} сообщений</span></div><div class="owner-message-list">${list.map(m=>{const u=getUser(m.from);return `<div class="owner-message"><div class="avatar">${initials(u)}</div><div><strong>@${escapeHTML(u?.username||"unknown")}</strong><p>${escapeHTML(m.text).replaceAll("\n","<br>")}</p><time>${escapeHTML(new Date(m.createdAt).toLocaleString("ru-RU"))}</time></div></div>`}).join("")}</div>`;
+  }
+  function ownerChatChanged(){renderOwnerChatViewer()}
+
+  /* Reports */
+  function reportUser(userId,reason="Нарушение правил"){if(userId===state.userId)return toast("Нельзя пожаловаться на себя.");state.db.reports.push({id:uid("report"),type:"user",targetId:userId,reporterId:state.userId,reason:String(reason).slice(0,300),status:"open",createdAt:now()});save();toast("Жалоба отправлена.","success");renderOwner();}
+  function reportPost(postId,reason="Нарушение правил"){state.db.reports.push({id:uid("report"),type:"post",targetId:postId,reporterId:state.userId,reason:String(reason).slice(0,300),status:"open",createdAt:now()});save();toast("Жалоба отправлена.","success");renderOwner();}
+  function renderOwnerReports(){
+    const box=$("#ownerReportList");if(!box)return;if(!isOwner()){box.innerHTML="";return}
+    const reports=[...state.db.reports].sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt)).slice(0,40);
+    box.innerHTML=reports.length?reports.map(r=>{const target=r.type==="user"?getUser(r.targetId):getUser(state.db.posts.find(p=>p.id===r.targetId)?.authorId);return `<div class="owner-row owner-post-row"><div class="owner-row-main"><strong>${r.type==="user"?"👤":"📝"} @${escapeHTML(target?.username||"unknown")}</strong><span>${escapeHTML(r.reason)} · ${escapeHTML(formatDate(r.createdAt))}</span></div><span class="owner-badge">${escapeHTML(r.status||"open")}</span><button class="secondary-button" data-report-close="${escapeHTML(r.id)}" type="button">Закрыть</button></div>`}).join(""):`<div class="empty-state compact"><strong>Жалоб нет</strong><p>Система спокойна.</p></div>`;
+    box.querySelectorAll("[data-report-close]").forEach(b=>b.onclick=()=>{const r=state.db.reports.find(x=>x.id===b.dataset.reportClose);if(r)r.status="closed";save();renderOwnerReports();toast("Жалоба закрыта.","success")});
+  }
+
+  /* Owner moderation actions */
+  function ownerDeleteUserV20(userId){
+    if(!isOwner())return toast("Доступ запрещён.");const u=getUser(userId);if(!u)return;if(u.role==="owner"||OWNER_USERNAMES.has(String(u.username).toLowerCase()))return toast("Owner-аккаунт нельзя удалить.");
+    if(!confirm(`Удалить @${u.username}? Будут удалены профиль, посты, комментарии, сообщения и рейтинг.`))return;
+    state.db.users=state.db.users.filter(x=>x.id!==userId);state.db.posts=state.db.posts.filter(x=>x.authorId!==userId);state.db.likes=state.db.likes.filter(x=>x.userId!==userId&&!state.db.posts.some(p=>p.id===x.postId));state.db.messages=state.db.messages.filter(x=>x.from!==userId&&x.to!==userId);state.db.comments=state.db.comments.filter(x=>x.authorId!==userId);state.db.reputation=state.db.reputation.filter(x=>x.fromId!==userId&&x.targetId!==userId);delete state.db.profilePhotos[userId];save();renderOwner();loadFeed();toast("Пользователь удалён.","success");
+  }
+
+  function renderOwnerV20(){
+    if(!isOwner())return;
+    renderOwnerChatViewer();renderOwnerReports();
+    const list=$("#ownerUserList");
+    list?.querySelectorAll(".owner-row").forEach(row=>{
+      const span=row.querySelector(".owner-row-main span");
+      const m=span?.textContent?.match(/@([^ ·]+)/);
+      const u=m?state.db.users.find(x=>x.username===m[1]):null;
+      if(u){row.title="Открыть профиль";row.style.cursor="pointer";row.onclick=e=>{if(e.target.closest("button"))return;openUserProfile(u.id)}}
+    });
+  }
+
+  /* Better room */
+  function renderRoomV20(){
+    const u=state.user; if(!u?.room)return;
+    const room=u.room;const preview=$("#roomPreview");
+    if(preview){preview.dataset.style=room.style||"mint";preview.innerHTML=`<div class="room-sky"></div><div class="room-orb"></div><div class="room-content"><span class="eyebrow">${room.visits?"OPEN SPACE":"PRIVATE SPACE"}</span><h2>${escapeHTML(room.name||"Моя комната")}</h2><p>${escapeHTML(room.description||"")}</p><div class="room-meta"><span>👤 ${room.participants?.length||0} гостей</span><span>🎮 ${room.game?"Игра: "+escapeHTML(room.game.type):"Готова к игре"}</span></div><div class="room-game-actions"><select id="roomGameSelect" class="select"><option value="ttt">❌⭕ Крестики-нолики</option><option value="reaction">⚡ Reaction</option><option value="number">🔢 Угадай число</option><option value="battleship">▦ Морской бой</option></select><button class="primary-button" data-room-game="ttt" id="startRoomGame" type="button">🎮 Играть вместе</button>${room.game?`<button class="secondary-button" data-stop-room-game="1" type="button">Завершить</button>`:""}</div><span class="room-owner">@${escapeHTML(u.username)}</span></div>`}
+  }
+    $("#startRoomGame")?.addEventListener("click",()=>{const game=$("#roomGameSelect")?.value||"ttt";inviteGame(game);});
+
+  /* Together games via shared room state. Local-first: tabs/browsers on same storage can synchronize. */
+  function inviteGame(game){
+    if(!state.user?.room)return;
+    state.user.room.game={type:game,hostId:state.userId,startedAt:now(),players:[state.userId]};save();renderRoomV20();toast("Игровая сессия создана 🎮","success");
+  }
+  function stopRoomGame(){if(!state.user?.room)return;state.user.room.game=null;save();renderRoomV20();toast("Игра завершена.","success")}
+
+  /* Enhanced post rendering with image */
+  const oldRenderPost = renderPost;
+  window.__nobodyOldRenderPost = oldRenderPost;
+  window.renderPost = function(p){
+    const a=p.author;const image=state.db.postImages?.[p.id];
+    return `<article class="post-card" data-post-id="${escapeHTML(p.id)}"><div class="post-header"><button class="post-author" data-user-id="${escapeHTML(a.id)}" type="button"><div class="avatar">${a.avatarImage?imageMarkup(a.avatarImage,"avatar-image"):initials(a)}</div><div class="post-author-info"><strong>${escapeHTML(a.displayName||a.username)}</strong><span>@${escapeHTML(a.username)} · ${escapeHTML(formatDate(p.createdAt))}</span></div></button>${a.id===state.userId?`<button class="post-more" data-delete-post="${escapeHTML(p.id)}" type="button">•••</button>`:""}</div><div class="post-body">${escapeHTML(p.text).replaceAll("\n","<br>")}${image?imageMarkup(image,"post-image"):""}</div><div class="post-actions"><button class="post-action like-button ${p.liked?"liked":""}" data-like-post="${escapeHTML(p.id)}" type="button">♡ <span>${p.likes}</span></button><button class="post-action" data-comment-post="${escapeHTML(p.id)}" type="button">◌ <span>${p.comments}</span></button><button class="post-action report-action" data-report-post="${escapeHTML(p.id)}" type="button">⚑</button><button class="post-action" data-share-post="${escapeHTML(p.id)}" type="button">↗</button></div></article>`;
+  };
+  renderPost=window.renderPost;
+
+  /* Patch feed button binding without removing original behavior. */
+  const oldBindPostButtons=bindPostButtons;
+  window.bindPostButtons=function(){
+    oldBindPostButtons();
+    $$('[data-comment-post]').forEach(b=>b.onclick=()=>openComments(b.dataset.commentPost));
+    $$('[data-report-post]').forEach(b=>b.onclick=()=>reportPost(b.dataset.reportPost));
+  };
+  bindPostButtons=window.bindPostButtons;
+
+  /* Patch profile functions after definitions exist. */
+  const oldLoadProfile=loadProfile;
+  window.loadProfile=function(){state.user=currentUser();updateUserUI();enhancedProfile(state.user,true);const posts=getPosts().filter(p=>p.author.id===state.userId);$("#profileFeed").innerHTML=posts.length?posts.map(renderPost).join(""):`<div class="empty-state"><div class="empty-icon">✦</div><strong>Пока нет публикаций</strong><p>Создай свой первый пост.</p></div>`;bindPostButtons();};
+  loadProfile=window.loadProfile;
+
+  const oldOpenUserProfile=openUserProfile;
+  window.openUserProfile=function(id){
+    const u=getUser(id);if(!u)return;const privacy=state.db.privacy?.[id]||u.privacy||{showID:true,allowMessages:true,showRoom:true};const r=reputationFor(id);const photos=state.db.profilePhotos[id]||[];const avatarSrc=photos[0]||u.avatarImage||"";
+    $("#userProfileModalContent").innerHTML=`<div class="public-profile">${avatarSrc?imageMarkup(avatarSrc,"public-avatar-image"): `<div class="avatar large">${initials(u)}</div>`}<h2>${escapeHTML(u.displayName||u.username)}</h2><p class="public-username">@${escapeHTML(u.username)}</p><p>${escapeHTML(u.bio||"Нет описания.")}</p>${privacy.showID?`<div class="profile-id">${escapeHTML(u.anonymousId)}</div>`:""}<div class="public-reputation"><span>👍 ${r.likes}</span><span>👎 ${r.dislikes}</span><span>Рейтинг ${r.score>0?"+":""}${r.score}</span></div><div class="public-gallery">${photos.slice(0,6).map(src=>imageMarkup(src,"public-gallery-image")).join("")}</div><div class="public-profile-actions">${u.id!==state.userId&&privacy.allowMessages?`<button class="primary-button full-button" id="modalMessageUser" type="button">Написать сообщение</button>`:""}<div class="profile-action-row">${u.id!==state.userId?`<button class="secondary-button" id="modalLikeUser" type="button">👍</button><button class="secondary-button" id="modalDislikeUser" type="button">👎</button><button class="secondary-button" id="modalReportUser" type="button">⚑</button>`:""}</div></div></div>`;
+    $("#modalMessageUser")?.addEventListener("click",()=>{closeModal("userProfileModal");navigate("messages");openChat(u.id)});
+    $("#modalLikeUser")?.addEventListener("click",()=>rateUser(u.id,1));$("#modalDislikeUser")?.addEventListener("click",()=>rateUser(u.id,-1));$("#modalReportUser")?.addEventListener("click",()=>reportUser(u.id));openModal("userProfileModal");
+  };
+  openUserProfile=window.openUserProfile;
+
+  /* Avatar upload + post photo upload */
+  function bindUploads(){
+    $("#avatarInput")?.addEventListener("change",e=>readImage(e.target.files?.[0],src=>{state.user.avatarImage=src;save();updateUserUI();loadProfile();toast("Аватар обновлён 📸","success")}));
+    $("#postImageInput")?.addEventListener("change",e=>{const file=e.target.files?.[0];readImage(file,src=>{const box=$("#postImagePreview");box.innerHTML=imageMarkup(src,"post-preview-image");box.classList.remove("hidden");box.dataset.image=src})});
+  }
+  const oldCreatePost=createPost;
+  window.createPost=function(e){
+    e.preventDefault();const text=$("#postText")?.value.trim()||"",preview=$("#postImagePreview"),img=preview?.dataset.image||"";
+    if(!text&&!img)return message($("#postMessage"),"Добавь текст или фото.");
+    const post={id:uid("post"),authorId:state.userId,text,createdAt:now(),comments:0};state.db.posts.unshift(post);if(img)state.db.postImages[post.id]=img;save();$("#postForm").reset();if(preview){preview.classList.add("hidden");preview.innerHTML="";delete preview.dataset.image}updatePostCounter();closeModal("postModal");loadFeed();toast("Пост опубликован ✦","success");
+  };
+  createPost=window.createPost;
+
+  /* Owner renderer enhancement */
+  const oldRenderOwner=renderOwner;
+  window.renderOwner=function(){oldRenderOwner();renderOwnerV20();};
+  renderOwner=window.renderOwner;
+
+  /* Event wiring */
+  function wireV20(){
+    ensureData();save();
+    applyV20Theme(localStorage.getItem(THEME_KEY_V20)||state.theme||"system");
+    $("#commentForm")?.addEventListener("submit",submitComment);
+    $("#ownerChatSelect")?.addEventListener("change",ownerChatChanged);
+    bindUploads();
+    $("#ownerUserList")?.addEventListener("click",e=>{
+      const row=e.target.closest(".owner-row");if(!row)return;const btn=e.target.closest("[data-owner-user]");if(btn)return;const text=row.querySelector(".owner-row-main span")?.textContent||"";
+    });
+    document.addEventListener("click",e=>{
+      const b=e.target.closest("[data-owner-open-user]");if(b)openUserProfile(b.dataset.ownerOpenUser);
+      const g=e.target.closest("[data-room-game]");if(g)inviteGame(g.dataset.roomGame);
+      const stop=e.target.closest("[data-stop-room-game]");if(stop)stopRoomGame();
+    });
+    window.addEventListener("storage",()=>{ensureData();state.user=currentUser();if(state.currentPage==="owner")renderOwner();if(state.currentPage==="profile")loadProfile();if(state.currentPage==="room")renderRoomV20();if(state.currentPage==="home")loadFeed();});
+    const mq=window.matchMedia?.("(prefers-color-scheme: dark)");mq?.addEventListener?.("change",()=>{if(state.theme==="system")applyV20Theme("system")});
+  }
+  const oldSetup=setup;
+  window.setupV20=wireV20;
+  // setup() is already executed by the original script. Run enhancement immediately when DOM is ready.
+  if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",()=>setTimeout(wireV20,0)); else setTimeout(wireV20,0);
+
+  // Keep enhanced room/profile rendering after navigation without replacing navigation logic.
+  const oldNavigate=navigate;
+  window.navigateV20=navigate;
+  navigate=function(page){oldNavigate(page);if(page==="profile")setTimeout(()=>loadProfile(),0);if(page==="owner")setTimeout(()=>renderOwner(),0);if(page==="room")setTimeout(()=>renderRoomV20(),0);};
+
+  // Add image to user avatars globally by making getUser return live object as before.
+  const oldUpdateUserUI=updateUserUI;
+  updateUserUI=function(){oldUpdateUserUI();const u=state.user;if(!u)return;const avatarSrc=u.avatarImage;["#headerProfileButton","#composerAvatar","#chatAvatar"].forEach(sel=>{const el=$(sel);if(el&&avatarSrc){el.classList.add("photo-avatar");el.innerHTML=imageMarkup(avatarSrc,"avatar-image") }});};
+
+  // Patch room load to include enhanced visual.
+  const oldLoadRoom=loadRoom;
+  loadRoom=function(){oldLoadRoom();setTimeout(renderRoomV20,0)};
+
+  // Patch theme selector after original setup has wired it.
+  setTimeout(()=>{
+    const select=$("#themeSelect");if(select){select.onchange=e=>applyV20Theme(e.target.value);}
+    $("#themeButton")?.addEventListener("click",()=>applyV20Theme(state.theme==="dark"?"light":state.theme==="light"?"dark":"dark"));
+  },20);
+
+  // Expose safe debug/version info without leaking private data.
+  window.NOBODY_VERSION=VERSION;
+})();

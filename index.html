@@ -72,7 +72,7 @@
 
     <section id="profilePage" class="screen hidden">
       <div class="page-head"><div><span class="eyebrow">PROFILE</span><h1>Твой профиль</h1></div></div>
-      <div id="profileCard" class="profile-card"></div><div id="profileInfo" class="info-grid"></div>
+      <div id="profileCard" class="profile-card"></div><div id="profileInfo" class="info-grid"></div><div id="profileGallery" class="profile-gallery"></div>
       <div class="section-title"><h2>Публикации</h2></div><div id="profileFeed" class="feed"></div>
     </section>
 
@@ -134,7 +134,18 @@
           <div id="ownerPostList" class="owner-list"></div>
         </section>
       </div>
-      <div class="setting-card owner-status-card"><div><strong>Локальный режим</strong><p>Данные NOBODY хранятся в localStorage этого браузера. Кнопка «Бэкап» сохраняет JSON-копию.</p></div><span class="status-dot"></span></div>
+      <div class="owner-columns owner-columns-wide">
+        <section class="owner-section">
+          <div class="owner-section-head"><div><span class="eyebrow">MESSAGES</span><h2>Просмотр переписок</h2></div><span class="owner-hint">Модерация</span></div>
+          <div class="owner-chat-picker"><select id="ownerChatSelect" class="select"><option value="">Выбери чат</option></select></div>
+          <div id="ownerChatViewer" class="owner-chat-viewer"><div class="empty-state compact"><strong>Выбери переписку</strong><p>Здесь отображаются сообщения выбранного чата.</p></div></div>
+        </section>
+        <section class="owner-section">
+          <div class="owner-section-head"><div><span class="eyebrow">REPORTS & REPUTATION</span><h2>Модерация</h2></div><span class="owner-hint">Контроль контента</span></div>
+          <div id="ownerReportList" class="owner-list"></div>
+        </section>
+      </div>
+      <div class="setting-card owner-status-card"><div><strong>Локальный режим</strong><p>Данные NOBODY хранятся в localStorage этого браузера. Владелец может просматривать переписки для модерации, управлять аккаунтами и экспортировать резервную копию.</p></div><span class="status-dot"></span></div>
     </section>
   </main>
 
@@ -151,12 +162,14 @@
 
   <div id="toast" class="toast"></div>
 
-  <div id="postModal" class="modal hidden"><div class="modal-backdrop" data-close-modal="postModal"></div><div class="modal-card"><div class="modal-head"><h2>Новый пост</h2><button class="icon-button" data-close-modal="postModal" type="button">×</button></div><form id="postForm"><textarea id="postText" class="textarea" maxlength="2000" placeholder="Что хочешь сказать?"></textarea><div class="modal-row"><button id="addEmojiButton" class="secondary-button" type="button">✦ Добавить символ</button><span id="postCounter">0 / 2000</span></div><p id="postMessage" class="message"></p><button class="primary-button full-button" type="submit">Опубликовать</button></form></div></div>
+  <div id="postModal" class="modal hidden"><div class="modal-backdrop" data-close-modal="postModal"></div><div class="modal-card"><div class="modal-head"><h2>Новый пост</h2><button class="icon-button" data-close-modal="postModal" type="button">×</button></div><form id="postForm"><label class="upload-button secondary-button" for="postImageInput">📷 Добавить фото</label><input id="postImageInput" class="file-input" type="file" accept="image/*"><div id="postImagePreview" class="upload-preview hidden"></div><textarea id="postText" class="textarea" maxlength="2000" placeholder="Что хочешь сказать?"></textarea><div class="modal-row"><button id="addEmojiButton" class="secondary-button" type="button">✦ Добавить символ</button><span id="postCounter">0 / 2000</span></div><p id="postMessage" class="message"></p><button class="primary-button full-button" type="submit">Опубликовать</button></form></div></div>
 
   <div id="userProfileModal" class="modal hidden"><div class="modal-backdrop" data-close-modal="userProfileModal"></div><div class="modal-card"><div class="modal-head"><h2>Профиль</h2><button class="icon-button" data-close-modal="userProfileModal" type="button">×</button></div><div id="userProfileModalContent"></div></div></div>
 
-  <div id="profileEditModal" class="modal hidden"><div class="modal-backdrop" data-close-modal="profileEditModal"></div><div class="modal-card"><div class="modal-head"><h2>Редактировать профиль</h2><button class="icon-button" data-close-modal="profileEditModal" type="button">×</button></div><form id="profileEditForm"><label>Ник<input id="editUsernameInput" class="input" maxlength="24" required></label><label>Описание<textarea id="editBioInput" class="textarea" maxlength="300" placeholder="Расскажи немного о себе"></textarea></label><p id="profileEditMessage" class="message"></p><button class="primary-button full-button" type="submit">Сохранить</button></form></div></div>
+  <div id="profileEditModal" class="modal hidden"><div class="modal-backdrop" data-close-modal="profileEditModal"></div><div class="modal-card"><div class="modal-head"><h2>Редактировать профиль</h2><button class="icon-button" data-close-modal="profileEditModal" type="button">×</button></div><form id="profileEditForm"><label class="upload-button secondary-button" for="avatarInput">📸 Изменить аватар</label><input id="avatarInput" class="file-input" type="file" accept="image/*"><label>Ник<input id="editUsernameInput" class="input" maxlength="24" required></label><label>Описание<textarea id="editBioInput" class="textarea" maxlength="300" placeholder="Расскажи немного о себе"></textarea></label><p id="profileEditMessage" class="message"></p><button class="primary-button full-button" type="submit">Сохранить</button></form></div></div>
 
+
+  <div id="commentsModal" class="modal hidden"><div class="modal-backdrop" data-close-modal="commentsModal"></div><div class="modal-card"><div class="modal-head"><h2>Комментарии</h2><button class="icon-button" data-close-modal="commentsModal" type="button">×</button></div><div id="commentsList" class="comments-list"></div><form id="commentForm" class="comment-form"><input id="commentInput" class="input" maxlength="500" placeholder="Написать комментарий..."><button class="primary-button" type="submit">Отправить</button></form></div></div>
   <div id="roomEditModal" class="modal hidden"><div class="modal-backdrop" data-close-modal="roomEditModal"></div><div class="modal-card"><div class="modal-head"><h2>Настроить комнату</h2><button class="icon-button" data-close-modal="roomEditModal" type="button">×</button></div><form id="roomEditForm"><label>Название<input id="roomNameInput" class="input" maxlength="50"></label><label>Описание<textarea id="roomDescriptionInput" class="textarea" maxlength="300"></textarea></label><label>Стиль<select id="roomStyleSelect" class="select"><option value="mint">Mint</option><option value="lavender">Lavender</option><option value="sand">Sand</option><option value="night">Night</option></select></label><button class="primary-button full-button" type="submit">Сохранить</button></form></div></div>
 
   <div id="privacyModal" class="modal hidden"><div class="modal-backdrop" data-close-modal="privacyModal"></div><div class="modal-card"><div class="modal-head"><h2>Приватность</h2><button class="icon-button" data-close-modal="privacyModal" type="button">×</button></div><div class="privacy-options"><label class="setting-card"><div><strong>Показывать Anonymous ID</strong><p>Другие смогут видеть твой ID.</p></div><span class="switch"><input id="showIDToggle" type="checkbox"><i></i></span></label><label class="setting-card"><div><strong>Разрешать сообщения</strong><p>Люди смогут начинать с тобой чат.</p></div><span class="switch"><input id="allowMessagesToggle" type="checkbox"><i></i></span></label><label class="setting-card"><div><strong>Показывать комнату</strong><p>Разрешить посещение комнаты.</p></div><span class="switch"><input id="showRoomToggle" type="checkbox"><i></i></span></label></div><button id="savePrivacyButton" class="primary-button full-button" type="button">Сохранить</button></div></div>
