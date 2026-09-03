@@ -1,0 +1,5106 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#7568d9">
+<meta name="description" content="NOBODY — anonymous social world">
+<meta name="application-name" content="NOBODY">
+<meta name="author" content="NOBODY">
+<meta name="robots" content="noindex,nofollow">
+<title>NOBODY</title>
+<link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+<div id="app">
+
+    <!-- =====================================================
+         APPLICATION HEADER
+    ====================================================== -->
+
+    <header
+        class="topbar"
+        id="topbar"
+        aria-label="Главная панель"
+    >
+
+        <div class="topbar-left">
+
+            <button
+                class="brand-button"
+                id="brandButton"
+                type="button"
+                aria-label="Открыть главную"
+            >
+
+                <span class="brand-mark">N</span>
+
+                <span class="brand-name">
+                    NOBODY
+                </span>
+
+            </button>
+
+        </div>
+
+
+        <div class="topbar-center">
+
+            <div
+                class="global-search"
+                id="globalSearch"
+            >
+
+                <span
+                    class="global-search-icon"
+                    aria-hidden="true"
+                >
+                    ⌕
+                </span>
+
+                <input
+                    id="globalSearchInput"
+                    class="global-search-input"
+                    type="search"
+                    maxlength="100"
+                    autocomplete="off"
+                    placeholder="Найти кого-нибудь..."
+                    aria-label="Поиск пользователей"
+                >
+
+                <button
+                    id="clearSearchButton"
+                    class="clear-search-button hidden"
+                    type="button"
+                    aria-label="Очистить поиск"
+                >
+                    ×
+                </button>
+
+            </div>
+
+        </div>
+
+
+        <div class="topbar-right">
+
+            <button
+                id="notificationsButton"
+                class="header-icon-button"
+                type="button"
+                aria-label="Уведомления"
+                title="Уведомления"
+            >
+
+                <span aria-hidden="true">
+                    ♡
+                </span>
+
+                <span
+                    id="notificationsBadge"
+                    class="notification-badge hidden"
+                    aria-label="Новые уведомления"
+                >
+                    0
+                </span>
+
+            </button>
+
+
+            <button
+                id="messagesButton"
+                class="header-icon-button"
+                type="button"
+                aria-label="Сообщения"
+                title="Сообщения"
+            >
+
+                <span aria-hidden="true">
+                    ◇
+                </span>
+
+                <span
+                    id="messagesBadge"
+                    class="notification-badge hidden"
+                    aria-label="Новые сообщения"
+                >
+                    0
+                </span>
+
+            </button>
+
+
+            <button
+                id="themeButton"
+                class="header-icon-button"
+                type="button"
+                aria-label="Сменить тему"
+                title="Сменить тему"
+            >
+                ◐
+            </button>
+
+
+            <button
+                id="headerProfileButton"
+                class="header-profile-button"
+                type="button"
+                aria-label="Открыть профиль"
+            >
+
+                <span
+                    id="headerProfileAvatar"
+                    class="mini-avatar"
+                >
+                    ?
+                </span>
+
+            </button>
+
+        </div>
+
+    </header>
+
+
+
+    <!-- =====================================================
+         AUTHENTICATION
+    ====================================================== -->
+
+    <section
+        id="authScreen"
+        class="auth-screen"
+        aria-label="Авторизация"
+    >
+
+        <div class="auth-background">
+
+            <div class="auth-orb auth-orb-one"></div>
+            <div class="auth-orb auth-orb-two"></div>
+            <div class="auth-orb auth-orb-three"></div>
+
+        </div>
+
+
+        <div class="auth-wrapper">
+
+            <div class="auth-card">
+
+                <div class="auth-brand">
+
+                    <div class="auth-logo">
+                        N
+                    </div>
+
+                    <div>
+
+                        <div class="auth-logo-title">
+                            NOBODY
+                        </div>
+
+                        <div class="auth-logo-subtitle">
+                            ANONYMOUS SOCIAL WORLD
+                        </div>
+
+                    </div>
+
+                </div>
+
+
+                <div class="auth-heading">
+
+                    <div class="auth-eyebrow">
+                        WELCOME TO NOBODY
+                    </div>
+
+                    <h1 class="auth-title">
+                        Be nobody.<br>
+                        <span>Be anyone.</span>
+                    </h1>
+
+                    <p class="auth-description">
+                        Социальное пространство, где ты сам
+                        решаешь, кем быть и сколько о себе
+                        рассказывать.
+                    </p>
+
+                </div>
+
+
+                <div
+                    class="auth-tabs"
+                    role="tablist"
+                    aria-label="Авторизация"
+                >
+
+                    <button
+                        class="auth-tab active"
+                        id="loginTab"
+                        type="button"
+                        role="tab"
+                        aria-selected="true"
+                        data-auth-mode="login"
+                    >
+                        Войти
+                    </button>
+
+
+                    <button
+                        class="auth-tab"
+                        id="registerTab"
+                        type="button"
+                        role="tab"
+                        aria-selected="false"
+                        data-auth-mode="register"
+                    >
+                        Создать аккаунт
+                    </button>
+
+                </div>
+
+
+                <form
+                    id="authForm"
+                    class="auth-form"
+                    novalidate
+                >
+
+                    <div class="form-field">
+
+                        <label
+                            for="usernameInput"
+                            class="form-label"
+                        >
+                            Ник
+                        </label>
+
+                        <div class="input-wrapper">
+
+                            <span class="input-prefix">
+                                @
+                            </span>
+
+                            <input
+                                id="usernameInput"
+                                name="username"
+                                class="form-input"
+                                type="text"
+                                maxlength="24"
+                                autocomplete="username"
+                                autocapitalize="none"
+                                spellcheck="false"
+                                placeholder="username"
+                            >
+
+                        </div>
+
+                        <div
+                            id="usernameHint"
+                            class="form-hint"
+                        >
+                            Можно использовать псевдоним.
+                        </div>
+
+                    </div>
+
+
+                    <div class="form-field">
+
+                        <label
+                            for="passwordInput"
+                            class="form-label"
+                        >
+                            Пароль
+                        </label>
+
+                        <div class="input-wrapper">
+
+                            <input
+                                id="passwordInput"
+                                name="password"
+                                class="form-input password-input"
+                                type="password"
+                                minlength="6"
+                                maxlength="128"
+                                autocomplete="current-password"
+                                placeholder="Минимум 6 символов"
+                                required
+                            >
+
+                            <button
+                                id="togglePasswordButton"
+                                class="password-toggle"
+                                type="button"
+                                aria-label="Показать пароль"
+                            >
+                                ◉
+                            </button>
+
+                        </div>
+
+                        <div
+                            id="passwordHint"
+                            class="form-hint"
+                        >
+                            Не используй реальные личные данные
+                            в качестве пароля.
+                        </div>
+
+                    </div>
+
+
+                    <div
+                        id="authExtraFields"
+                        class="auth-extra-fields hidden"
+                    >
+
+                        <div class="form-field">
+
+                            <label
+                                for="confirmPasswordInput"
+                                class="form-label"
+                            >
+                                Повторить пароль
+                            </label>
+
+                            <input
+                                id="confirmPasswordInput"
+                                name="confirmPassword"
+                                class="form-input"
+                                type="password"
+                                minlength="6"
+                                maxlength="128"
+                                autocomplete="new-password"
+                                placeholder="Повтори пароль"
+                            >
+
+                        </div>
+
+
+                        <div class="form-field">
+
+                            <label
+                                for="anonymousIdPreview"
+                                class="form-label"
+                            >
+                                Anonymous ID
+                            </label>
+
+                            <div
+                                id="anonymousIdPreview"
+                                class="generated-id-preview"
+                            >
+                                Будет создан автоматически
+                            </div>
+
+                            <div class="form-hint">
+                                ID нельзя выбрать вручную.
+                            </div>
+
+                        </div>
+
+                    </div>
+
+
+                    <div
+                        id="authError"
+                        class="form-message error hidden"
+                        role="alert"
+                    ></div>
+
+
+                    <div
+                        id="authSuccess"
+                        class="form-message success hidden"
+                        role="status"
+                    ></div>
+
+
+                    <button
+                        id="authSubmit"
+                        class="primary-button auth-submit"
+                        type="submit"
+                    >
+                        Войти
+                    </button>
+
+
+                    <div class="auth-divider">
+
+                        <span></span>
+
+                        <small>
+                            или
+                        </small>
+
+                        <span></span>
+
+                    </div>
+
+
+                    <button
+                        id="guestPreviewButton"
+                        class="secondary-button full-width"
+                        type="button"
+                    >
+                        Посмотреть демо
+                    </button>
+
+                </form>
+
+
+                <div class="auth-footer">
+
+                    <p>
+                        Используя NOBODY, ты соглашаешься
+                        соблюдать правила платформы.
+                    </p>
+
+                    <button
+                        id="openRulesFromAuth"
+                        class="text-button"
+                        type="button"
+                    >
+                        Читать правила
+                    </button>
+
+                </div>
+
+            </div>
+
+
+            <div class="auth-feature-row">
+
+                <div class="auth-feature">
+
+                    <span class="auth-feature-icon">
+                        ◌
+                    </span>
+
+                    <span>
+                        Псевдонимы
+                    </span>
+
+                </div>
+
+
+                <div class="auth-feature">
+
+                    <span class="auth-feature-icon">
+                        ◇
+                    </span>
+
+                    <span>
+                        Посты
+                    </span>
+
+                </div>
+
+
+                <div class="auth-feature">
+
+                    <span class="auth-feature-icon">
+                        ♧
+                    </span>
+
+                    <span>
+                        Игры
+                    </span>
+
+                </div>
+
+
+                <div class="auth-feature">
+
+                    <span class="auth-feature-icon">
+                        □
+                    </span>
+
+                    <span>
+                        Комнаты
+                    </span>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </section>
+
+
+
+    <!-- =====================================================
+         MAIN APPLICATION
+    ====================================================== -->
+
+    <div
+        id="mainApplication"
+        class="application hidden"
+    >
+
+        <!-- =================================================
+             DESKTOP SIDEBAR
+        ================================================== -->
+
+        <aside
+            id="desktopSidebar"
+            class="sidebar"
+            aria-label="Навигация"
+        >
+
+            <div class="sidebar-inner">
+
+                <nav
+                    class="main-navigation"
+                    aria-label="Основная навигация"
+                >
+
+                    <button
+                        class="navigation-button active"
+                        type="button"
+                        data-page="home"
+                    >
+
+                        <span class="navigation-icon">
+                            ⌂
+                        </span>
+
+                        <span class="navigation-label">
+                            Главная
+                        </span>
+
+                    </button>
+
+
+                    <button
+                        class="navigation-button"
+                        type="button"
+                        data-page="explore"
+                    >
+
+                        <span class="navigation-icon">
+                            ⌕
+                        </span>
+
+                        <span class="navigation-label">
+                            Исследовать
+                        </span>
+
+                    </button>
+
+
+                    <button
+                        class="navigation-button"
+                        type="button"
+                        data-page="notifications"
+                    >
+
+                        <span class="navigation-icon">
+                            ♡
+                        </span>
+
+                        <span class="navigation-label">
+                            Уведомления
+                        </span>
+
+                        <span
+                            class="navigation-counter hidden"
+                            id="sidebarNotificationCounter"
+                        >
+                            0
+                        </span>
+
+                    </button>
+
+
+                    <button
+                        class="navigation-button"
+                        type="button"
+                        data-page="messages"
+                    >
+
+                        <span class="navigation-icon">
+                            ◇
+                        </span>
+
+                        <span class="navigation-label">
+                            Сообщения
+                        </span>
+
+                        <span
+                            class="navigation-counter hidden"
+                            id="sidebarMessageCounter"
+                        >
+                            0
+                        </span>
+
+                    </button>
+
+
+                    <button
+                        class="navigation-button"
+                        type="button"
+                        data-page="rooms"
+                    >
+
+                        <span class="navigation-icon">
+                            ▣
+                        </span>
+
+                        <span class="navigation-label">
+                            Комнаты
+                        </span>
+
+                    </button>
+
+
+                    <button
+                        class="navigation-button"
+                        type="button"
+                        data-page="games"
+                    >
+
+                        <span class="navigation-icon">
+                            ♜
+                        </span>
+
+                        <span class="navigation-label">
+                            Игры
+                        </span>
+
+                    </button>
+
+
+                    <button
+                        class="navigation-button"
+                        type="button"
+                        data-page="characters"
+                    >
+
+                        <span class="navigation-icon">
+                            ◯
+                        </span>
+
+                        <span class="navigation-label">
+                            Персонажи
+                        </span>
+
+                    </button>
+
+
+                    <button
+                        class="navigation-button"
+                        type="button"
+                        data-page="profile"
+                    >
+
+                        <span class="navigation-icon">
+                            ◎
+                        </span>
+
+                        <span class="navigation-label">
+                            Профиль
+                        </span>
+
+                    </button>
+
+
+                    <button
+                        class="navigation-button"
+                        type="button"
+                        data-page="settings"
+                    >
+
+                        <span class="navigation-icon">
+                            ⚙
+                        </span>
+
+                        <span class="navigation-label">
+                            Настройки
+                        </span>
+
+                    </button>
+
+                </nav>
+
+
+                <div class="sidebar-divider"></div>
+
+
+                <button
+                    id="createPostSidebarButton"
+                    class="create-button"
+                    type="button"
+                >
+
+                    <span>
+                        ＋
+                    </span>
+
+                    <span>
+                        Создать
+                    </span>
+
+                </button>
+
+
+                <div class="sidebar-spacer"></div>
+
+
+                <div class="sidebar-account">
+
+                    <button
+                        id="sidebarAccountButton"
+                        class="sidebar-account-button"
+                        type="button"
+                    >
+
+                        <span
+                            id="sidebarAvatar"
+                            class="avatar"
+                        >
+                            ?
+                        </span>
+
+                        <span class="sidebar-account-info">
+
+                            <strong
+                                id="sidebarUsername"
+                            >
+                                @Nobody
+                            </strong>
+
+                            <small
+                                id="sidebarAnonymousId"
+                            >
+                                user_XXXXXXXXXX
+                            </small>
+
+                        </span>
+
+                        <span class="sidebar-account-arrow">
+                            ···
+                        </span>
+
+                    </button>
+
+                </div>
+
+            </div>
+
+        </aside>
+
+
+
+        <!-- =================================================
+             CONTENT
+        ================================================== -->
+
+        <main
+            id="mainContent"
+            class="main-content"
+        >
+
+            <!-- =============================================
+                 HOME PAGE
+            ============================================== -->
+
+            <section
+                id="homePage"
+                class="page active"
+                data-page-section="home"
+            >
+
+                <div class="page-header home-header">
+
+                    <div>
+
+                        <div class="page-eyebrow">
+                            YOUR WORLD
+                        </div>
+
+                        <h1
+                            id="welcomeText"
+                            class="page-title"
+                        >
+                            Добро пожаловать.
+                        </h1>
+
+                        <p class="page-subtitle">
+                            Здесь может появиться что угодно.
+                        </p>
+
+                    </div>
+
+
+                    <div class="page-header-actions">
+
+                        <button
+                            id="refreshFeedButton"
+                            class="icon-action-button"
+                            type="button"
+                            title="Обновить ленту"
+                            aria-label="Обновить ленту"
+                        >
+                            ↻
+                        </button>
+
+                        <button
+                            id="createPostButton"
+                            class="primary-button"
+                            type="button"
+                        >
+                            ＋ Пост
+                        </button>
+
+                    </div>
+
+                </div>
+
+
+                <!-- STORY STRIP -->
+
+                <section
+                    id="storiesSection"
+                    class="stories-section"
+                    aria-label="Истории"
+                >
+
+                    <div class="section-header">
+
+                        <h2>
+                            Истории
+                        </h2>
+
+                        <button
+                            id="viewAllStoriesButton"
+                            class="text-button"
+                            type="button"
+                        >
+                            Все
+                        </button>
+
+                    </div>
+
+
+                    <div
+                        id="storiesList"
+                        class="stories-list"
+                    >
+
+                        <button
+                            id="createStoryButton"
+                            class="story-item create-story"
+                            type="button"
+                        >
+
+                            <span class="story-avatar">
+                                ＋
+                            </span>
+
+                            <span class="story-name">
+                                Твоя история
+                            </span>
+
+                        </button>
+
+                    </div>
+
+                </section>
+
+
+                <!-- QUICK COMPOSER -->
+
+                <section
+                    class="quick-composer"
+                    id="quickComposer"
+                >
+
+                    <div
+                        id="quickComposerAvatar"
+                        class="avatar"
+                    >
+                        ?
+                    </div>
+
+                    <button
+                        id="quickComposerButton"
+                        class="quick-composer-input"
+                        type="button"
+                    >
+                        Что происходит?
+                    </button>
+
+                    <button
+                        id="quickComposerMediaButton"
+                        class="quick-composer-action"
+                        type="button"
+                        aria-label="Добавить медиа"
+                    >
+                        ▧
+                    </button>
+
+                </section>
+
+
+                <!-- FEED FILTERS -->
+
+                <div class="feed-toolbar">
+
+                    <div class="feed-filters">
+
+                        <button
+                            class="feed-filter active"
+                            type="button"
+                            data-feed-filter="all"
+                        >
+                            Для тебя
+                        </button>
+
+                        <button
+                            class="feed-filter"
+                            type="button"
+                            data-feed-filter="following"
+                        >
+                            Подписки
+                        </button>
+
+                        <button
+                            class="feed-filter"
+                            type="button"
+                            data-feed-filter="new"
+                        >
+                            Новое
+                        </button>
+
+                    </div>
+
+
+                    <button
+                        id="feedOptionsButton"
+                        class="icon-action-button"
+                        type="button"
+                        aria-label="Настройки ленты"
+                    >
+                        ···
+                    </button>
+
+                </div>
+
+
+                <!-- FEED -->
+
+                <div
+                    id="feed"
+                    class="feed"
+                    aria-live="polite"
+                >
+
+                    <article class="feed-placeholder">
+
+                        <div class="loading-spinner"></div>
+
+                        <p>
+                            Загружаем NOBODY...
+                        </p>
+
+                    </article>
+
+                </div>
+
+
+                <div
+                    id="feedEnd"
+                    class="feed-end hidden"
+                >
+
+                    <span>
+                        Ты дошёл до конца.
+                    </span>
+
+                </div>
+
+            </section>
+
+
+
+            <!-- =============================================
+                 EXPLORE PAGE
+            ============================================== -->
+
+            <section
+                id="explorePage"
+                class="page hidden"
+                data-page-section="explore"
+            >
+
+                <div class="page-header">
+
+                    <div>
+
+                        <div class="page-eyebrow">
+                            EXPLORE
+                        </div>
+
+                        <h1 class="page-title">
+                            Найти кого-нибудь
+                        </h1>
+
+                        <p class="page-subtitle">
+                            Ник, Anonymous ID или интерес.
+                        </p>
+
+                    </div>
+
+                </div>
+
+
+                <div class="large-search">
+
+                    <span class="large-search-icon">
+                        ⌕
+                    </span>
+
+                    <input
+                        id="searchInput"
+                        class="large-search-input"
+                        type="search"
+                        maxlength="100"
+                        autocomplete="off"
+                        placeholder="Например: @nobody или user_A1B2C3D4E5"
+                    >
+
+                    <button
+                        id="searchClearButton"
+                        class="clear-search-button hidden"
+                        type="button"
+                    >
+                        ×
+                    </button>
+
+                </div>
+
+
+                <div
+                    id="searchSuggestions"
+                    class="search-suggestions"
+                >
+
+                    <div class="suggestion-title">
+                        Попробуй найти
+                    </div>
+
+                    <div class="suggestion-tags">
+
+                        <button
+                            class="suggestion-tag"
+                            type="button"
+                            data-search-example="art"
+                        >
+                            🎨 art
+                        </button>
+
+                        <button
+                            class="suggestion-tag"
+                            type="button"
+                            data-search-example="music"
+                        >
+                            🎧 music
+                        </button>
+
+                        <button
+                            class="suggestion-tag"
+                            type="button"
+                            data-search-example="games"
+                        >
+                            🎮 games
+                        </button>
+
+                        <button
+                            class="suggestion-tag"
+                            type="button"
+                            data-search-example="books"
+                        >
+                            📚 books
+                        </button>
+
+                        <button
+                            class="suggestion-tag"
+                            type="button"
+                            data-search-example="movies"
+                        >
+                            🎬 movies
+                        </button>
+
+                    </div>
+
+                </div>
+
+
+                <div
+                    id="searchResults"
+                    class="search-results"
+                ></div>
+
+
+                <section
+                    id="discoverSection"
+                    class="discover-section"
+                >
+
+                    <div class="section-header">
+
+                        <div>
+
+                            <h2>
+                                Возможно, тебе понравится
+                            </h2>
+
+                            <p>
+                                Люди и пространства NOBODY.
+                            </p>
+
+                        </div>
+
+                        <button
+                            id="refreshDiscoverButton"
+                            class="icon-action-button"
+                            type="button"
+                        >
+                            ↻
+                        </button>
+
+                    </div>
+
+
+                    <div
+                        id="discoverUsers"
+                        class="discover-grid"
+                    ></div>
+
+                </section>
+
+            </section>
+
+
+
+            <!-- =============================================
+                 NOTIFICATIONS PAGE
+            ============================================== -->
+
+            <section
+                id="notificationsPage"
+                class="page hidden"
+                data-page-section="notifications"
+            >
+
+                <div class="page-header">
+
+                    <div>
+
+                        <div class="page-eyebrow">
+                            NOTIFICATIONS
+                        </div>
+
+                        <h1 class="page-title">
+                            Уведомления
+                        </h1>
+
+                    </div>
+
+
+                    <button
+                        id="markNotificationsReadButton"
+                        class="secondary-button"
+                        type="button"
+                    >
+                        Прочитать всё
+                    </button>
+
+                </div>
+
+
+                <div class="notification-tabs">
+
+                    <button
+                        class="notification-tab active"
+                        type="button"
+                        data-notification-filter="all"
+                    >
+                        Все
+                    </button>
+
+                    <button
+                        class="notification-tab"
+                        type="button"
+                        data-notification-filter="mentions"
+                    >
+                        Упоминания
+                    </button>
+
+                    <button
+                        class="notification-tab"
+                        type="button"
+                        data-notification-filter="social"
+                    >
+                        Социальные
+                    </button>
+
+                </div>
+
+
+                <div
+                    id="notificationsList"
+                    class="notifications-list"
+                ></div>
+
+            </section>
+
+
+
+            <!-- =============================================
+                 MESSAGES PAGE
+            ============================================== -->
+
+            <section
+                id="messagesPage"
+                class="page hidden"
+                data-page-section="messages"
+            >
+
+                <div class="messages-layout">
+
+                    <aside
+                        class="conversations-panel"
+                        id="conversationsPanel"
+                    >
+
+                        <div class="conversations-header">
+
+                            <div>
+
+                                <div class="page-eyebrow">
+                                    PRIVATE SPACE
+                                </div>
+
+                                <h1>
+                                    Сообщения
+                                </h1>
+
+                            </div>
+
+                            <button
+                                id="newConversationButton"
+                                class="icon-action-button"
+                                type="button"
+                                aria-label="Новое сообщение"
+                            >
+                                ＋
+                            </button>
+
+                        </div>
+
+
+                        <div class="conversation-search">
+
+                            <span>
+                                ⌕
+                            </span>
+
+                            <input
+                                id="conversationSearchInput"
+                                type="search"
+                                placeholder="Поиск чатов..."
+                            >
+
+                        </div>
+
+
+                        <div
+                            id="conversationsList"
+                            class="conversations-list"
+                        ></div>
+
+                    </aside>
+
+
+                    <section
+                        class="chat-panel"
+                        id="chatPanel"
+                    >
+
+                        <div
+                            id="chatEmptyState"
+                            class="chat-empty-state"
+                        >
+
+                            <div class="empty-icon">
+                                ◇
+                            </div>
+
+                            <h2>
+                                Твои сообщения
+                            </h2>
+
+                            <p>
+                                Выбери разговор или начни
+                                новый.
+                            </p>
+
+                            <button
+                                id="startConversationEmptyButton"
+                                class="primary-button"
+                                type="button"
+                            >
+                                Новое сообщение
+                            </button>
+
+                        </div>
+
+
+                        <div
+                            id="activeChat"
+                            class="active-chat hidden"
+                        >
+
+                            <header class="chat-header">
+
+                                <button
+                                    id="chatBackButton"
+                                    class="mobile-only icon-action-button"
+                                    type="button"
+                                >
+                                    ←
+                                </button>
+
+
+                                <div
+                                    id="chatUserAvatar"
+                                    class="avatar"
+                                >
+                                    ?
+                                </div>
+
+
+                                <div class="chat-user-info">
+
+                                    <strong
+                                        id="chatUserName"
+                                    >
+                                        @Nobody
+                                    </strong>
+
+                                    <small
+                                        id="chatUserStatus"
+                                    >
+                                        Anonymous
+                                    </small>
+
+                                </div>
+
+
+                                <button
+                                    id="chatOptionsButton"
+                                    class="icon-action-button"
+                                    type="button"
+                                >
+                                    ···
+                                </button>
+
+                            </header>
+
+
+                            <div
+                                id="chatMessages"
+                                class="chat-messages"
+                            ></div>
+
+
+                            <form
+                                id="messageForm"
+                                class="message-composer"
+                            >
+
+                                <button
+                                    id="messageMediaButton"
+                                    class="composer-icon-button"
+                                    type="button"
+                                    aria-label="Добавить файл"
+                                >
+                                    ＋
+                                </button>
+
+
+                                <textarea
+                                    id="messageInput"
+                                    class="message-input"
+                                    maxlength="2000"
+                                    rows="1"
+                                    placeholder="Написать сообщение..."
+                                ></textarea>
+
+
+                                <button
+                                    id="messageEmojiButton"
+                                    class="composer-icon-button"
+                                    type="button"
+                                    aria-label="Эмодзи"
+                                >
+                                    ☺
+                                </button>
+
+
+                                <button
+                                    id="sendMessageButton"
+                                    class="send-button"
+                                    type="submit"
+                                    aria-label="Отправить"
+                                >
+                                    →
+                                </button>
+
+                            </form>
+
+                        </div>
+
+                    </section>
+
+                </div>
+
+            </section>
+
+
+
+            <!-- =============================================
+                 ROOMS PAGE
+            ============================================== -->
+
+            <section
+                id="roomsPage"
+                class="page hidden"
+                data-page-section="rooms"
+            >
+
+                <div class="page-header">
+
+                    <div>
+
+                        <div class="page-eyebrow">
+                            NOBODY SPACES
+                        </div>
+
+                        <h1 class="page-title">
+                            Комнаты
+                        </h1>
+
+                        <p class="page-subtitle">
+                            Создавай места, куда могут
+                            заглянуть другие пользователи.
+                        </p>
+
+                    </div>
+
+
+                    <button
+                        id="createRoomButton"
+                        class="primary-button"
+                        type="button"
+                    >
+                        ＋ Комната
+                    </button>
+
+                </div>
+
+
+                <div class="room-filters">
+
+                    <button
+                        class="room-filter active"
+                        type="button"
+                        data-room-filter="all"
+                    >
+                        Все
+                    </button>
+
+                    <button
+                        class="room-filter"
+                        type="button"
+                        data-room-filter="popular"
+                    >
+                        Популярные
+                    </button>
+
+                    <button
+                        class="room-filter"
+                        type="button"
+                        data-room-filter="new"
+                    >
+                        Новые
+                    </button>
+
+                    <button
+                        class="room-filter"
+                        type="button"
+                        data-room-filter="following"
+                    >
+                        Мои
+                    </button>
+
+                </div>
+
+
+                <div
+                    id="roomsGrid"
+                    class="rooms-grid"
+                ></div>
+
+
+                <div
+                    id="roomEmptyState"
+                    class="empty-state hidden"
+                >
+
+                    <div class="empty-icon">
+                        ▣
+                    </div>
+
+                    <h2>
+                        Здесь пока пусто
+                    </h2>
+
+                    <p>
+                        Создай первую комнату.
+                    </p>
+
+                    <button
+                        class="primary-button"
+                        type="button"
+                        data-action="create-room"
+                    >
+                        Создать комнату
+                    </button>
+
+                </div>
+
+            </section>
+
+
+
+            <!-- =============================================
+                 GAMES PAGE
+            ============================================== -->
+
+            <section
+                id="gamesPage"
+                class="page hidden"
+                data-page-section="games"
+            >
+
+                <div class="page-header">
+
+                    <div>
+
+                        <div class="page-eyebrow">
+                            PLAYGROUND
+                        </div>
+
+                        <h1 class="page-title">
+                            Игры
+                        </h1>
+
+                        <p class="page-subtitle">
+                            Небольшие игры для двоих и больше.
+                        </p>
+
+                    </div>
+
+                </div>
+
+
+                <div class="games-featured">
+
+                    <div class="games-featured-content">
+
+                        <span class="games-featured-label">
+                            ИГРА НЕДЕЛИ
+                        </span>
+
+                        <h2>
+                            Морской бой
+                        </h2>
+
+                        <p>
+                            Найди корабли соперника раньше,
+                            чем он найдёт твои.
+                        </p>
+
+                        <button
+                            id="featuredGameButton"
+                            class="primary-button"
+                            type="button"
+                            data-game="battleship"
+                        >
+                            Играть
+                        </button>
+
+                    </div>
+
+                    <div class="games-featured-art">
+                        ◈
+                    </div>
+
+                </div>
+
+
+                <div class="games-grid">
+
+                    <article
+                        class="game-card"
+                        data-game-card="tic-tac-toe"
+                    >
+
+                        <div class="game-icon">
+                            ×○
+                        </div>
+
+                        <div class="game-card-content">
+
+                            <h3>
+                                Крестики-нолики
+                            </h3>
+
+                            <p>
+                                Быстрая классика 1 на 1.
+                            </p>
+
+                            <div class="game-meta">
+                                2 игрока
+                            </div>
+
+                        </div>
+
+                        <button
+                            class="game-play-button"
+                            type="button"
+                            data-game="tic-tac-toe"
+                        >
+                            →
+                        </button>
+
+                    </article>
+
+
+                    <article
+                        class="game-card"
+                        data-game-card="battleship"
+                    >
+
+                        <div class="game-icon">
+                            ▦
+                        </div>
+
+                        <div class="game-card-content">
+
+                            <h3>
+                                Морской бой
+                            </h3>
+
+                            <p>
+                                Тактика, удача и немного
+                                паранойи.
+                            </p>
+
+                            <div class="game-meta">
+                                2 игрока
+                            </div>
+
+                        </div>
+
+                        <button
+                            class="game-play-button"
+                            type="button"
+                            data-game="battleship"
+                        >
+                            →
+                        </button>
+
+                    </article>
+
+
+                    <article
+                        class="game-card"
+                        data-game-card="connect-four"
+                    >
+
+                        <div class="game-icon">
+                            ●○
+                        </div>
+
+                        <div class="game-card-content">
+
+                            <h3>
+                                Четыре в ряд
+                            </h3>
+
+                            <p>
+                                Собери линию первым.
+                            </p>
+
+                            <div class="game-meta">
+                                2 игрока
+                            </div>
+
+                        </div>
+
+                        <button
+                            class="game-play-button"
+                            type="button"
+                            data-game="connect-four"
+                        >
+                            →
+                        </button>
+
+                    </article>
+
+
+                    <article
+                        class="game-card"
+                        data-game-card="guess"
+                    >
+
+                        <div class="game-icon">
+                            ?
+                        </div>
+
+                        <div class="game-card-content">
+
+                            <h3>
+                                Угадай
+                            </h3>
+
+                            <p>
+                                Кто лучше знает соперника?
+                            </p>
+
+                            <div class="game-meta">
+                                2+ игрока
+                            </div>
+
+                        </div>
+
+                        <button
+                            class="game-play-button"
+                            type="button"
+                            data-game="guess"
+                        >
+                            →
+                        </button>
+
+                    </article>
+
+
+                    <article
+                        class="game-card"
+                        data-game-card="reaction"
+                    >
+
+                        <div class="game-icon">
+                            ⚡
+                        </div>
+
+                        <div class="game-card-content">
+
+                            <h3>
+                                Reaction
+                            </h3>
+
+                            <p>
+                                Кто быстрее нажмёт?
+                            </p>
+
+                            <div class="game-meta">
+                                2+ игрока
+                            </div>
+
+                        </div>
+
+                        <button
+                            class="game-play-button"
+                            type="button"
+                            data-game="reaction"
+                        >
+                            →
+                        </button>
+
+                    </article>
+
+
+                    <article
+                        class="game-card"
+                        data-game-card="memory"
+                    >
+
+                        <div class="game-icon">
+                            ▫
+                        </div>
+
+                        <div class="game-card-content">
+
+                            <h3>
+                                Memory
+                            </h3>
+
+                            <p>
+                                Найди одинаковые карточки.
+                            </p>
+
+                            <div class="game-meta">
+                                1–4 игрока
+                            </div>
+
+                        </div>
+
+                        <button
+                            class="game-play-button"
+                            type="button"
+                            data-game="memory"
+                        >
+                            →
+                        </button>
+
+                    </article>
+
+                </div>
+
+            </section>
+
+
+
+            <!-- =============================================
+                 CHARACTERS PAGE
+            ============================================== -->
+
+            <section
+                id="charactersPage"
+                class="page hidden"
+                data-page-section="characters"
+            >
+
+                <div class="page-header">
+
+                    <div>
+
+                        <div class="page-eyebrow">
+                            YOUR CHARACTERS
+                        </div>
+
+                        <h1 class="page-title">
+                            Персонажи
+                        </h1>
+
+                        <p class="page-subtitle">
+                            Создавай персонажей и отправляйся
+                            с ними в свой NOBODY-мир.
+                        </p>
+
+                    </div>
+
+
+                    <button
+                        id="createCharacterButton"
+                        class="primary-button"
+                        type="button"
+                    >
+                        ＋ Персонаж
+                    </button>
+
+                </div>
+
+
+                <div class="character-intro">
+
+                    <div class="character-intro-icon">
+                        ◯
+                    </div>
+
+                    <div>
+
+                        <h2>
+                            Это ещё только начало.
+                        </h2>
+
+                        <p>
+                            В будущих версиях персонажи смогут
+                            гулять по локациям, играть,
+                            общаться и посещать комнаты.
+                        </p>
+
+                    </div>
+
+                </div>
+
+
+                <div
+                    id="charactersGrid"
+                    class="characters-grid"
+                ></div>
+
+            </section>
+
+
+
+            <!-- =============================================
+                 PROFILE PAGE
+            ============================================== -->
+
+            <section
+                id="profilePage"
+                class="page hidden"
+                data-page-section="profile"
+            >
+
+                <div
+                    id="profileCard"
+                    class="profile-card"
+                >
+
+                    <div class="profile-cover"></div>
+
+                    <div class="profile-main">
+
+                        <div
+                            id="profileAvatar"
+                            class="profile-avatar"
+                        >
+                            ?
+                        </div>
+
+                        <div class="profile-actions">
+
+                            <button
+                                id="editProfileButton"
+                                class="secondary-button"
+                                type="button"
+                            >
+                                Изменить профиль
+                            </button>
+
+                            <button
+                                id="profileMoreButton"
+                                class="icon-action-button"
+                                type="button"
+                            >
+                                ···
+                            </button>
+
+                        </div>
+
+
+                        <div class="profile-identity">
+
+                            <h1
+                                id="profileUsername"
+                                class="profile-name"
+                            >
+                                @Nobody
+                            </h1>
+
+                            <div
+                                id="profileAnonymousId"
+                                class="profile-id"
+                            >
+                                user_XXXXXXXXXX
+                            </div>
+
+                            <p
+                                id="profileBio"
+                                class="profile-bio"
+                            >
+                                Здесь пока ничего нет.
+                            </p>
+
+                        </div>
+
+
+                        <div class="profile-stats">
+
+                            <button
+                                class="profile-stat"
+                                type="button"
+                                data-profile-stat="posts"
+                            >
+
+                                <strong id="profilePostsCount">
+                                    0
+                                </strong>
+
+                                <span>
+                                    постов
+                                </span>
+
+                            </button>
+
+
+                            <button
+                                class="profile-stat"
+                                type="button"
+                                data-profile-stat="followers"
+                            >
+
+                                <strong id="profileFollowersCount">
+                                    0
+                                </strong>
+
+                                <span>
+                                    подписчиков
+                                </span>
+
+                            </button>
+
+
+                            <button
+                                class="profile-stat"
+                                type="button"
+                                data-profile-stat="following"
+                            >
+
+                                <strong id="profileFollowingCount">
+                                    0
+                                </strong>
+
+                                <span>
+                                    подписок
+                                </span>
+
+                            </button>
+
+                        </div>
+
+
+                        <div class="profile-tabs">
+
+                            <button
+                                class="profile-tab active"
+                                type="button"
+                                data-profile-tab="posts"
+                            >
+                                Посты
+                            </button>
+
+                            <button
+                                class="profile-tab"
+                                type="button"
+                                data-profile-tab="media"
+                            >
+                                Медиа
+                            </button>
+
+                            <button
+                                class="profile-tab"
+                                type="button"
+                                data-profile-tab="likes"
+                            >
+                                Понравилось
+                            </button>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+
+                <div
+                    id="profileContent"
+                    class="profile-content"
+                ></div>
+
+            </section>
+
+
+
+            <!-- =============================================
+                 SETTINGS PAGE
+            ============================================== -->
+
+            <section
+                id="settingsPage"
+                class="page hidden"
+                data-page-section="settings"
+            >
+
+                <div class="page-header">
+
+                    <div>
+
+                        <div class="page-eyebrow">
+                            SETTINGS
+                        </div>
+
+                        <h1 class="page-title">
+                            Настройки
+                        </h1>
+
+                        <p class="page-subtitle">
+                            Управляй своим пространством NOBODY.
+                        </p>
+
+                    </div>
+
+                </div>
+
+
+                <div class="settings-layout">
+
+                    <aside class="settings-navigation">
+
+                        <button
+                            class="settings-nav-button active"
+                            type="button"
+                            data-settings-section="appearance"
+                        >
+                            <span>◐</span>
+                            Внешний вид
+                        </button>
+
+
+                        <button
+                            class="settings-nav-button"
+                            type="button"
+                            data-settings-section="account"
+                        >
+                            <span>◎</span>
+                            Аккаунт
+                        </button>
+
+
+                        <button
+                            class="settings-nav-button"
+                            type="button"
+                            data-settings-section="privacy"
+                        >
+                            <span>◇</span>
+                            Приватность
+                        </button>
+
+
+                        <button
+                            class="settings-nav-button"
+                            type="button"
+                            data-settings-section="notifications"
+                        >
+                            <span>♡</span>
+                            Уведомления
+                        </button>
+
+
+                        <button
+                            class="settings-nav-button"
+                            type="button"
+                            data-settings-section="safety"
+                        >
+                            <span>△</span>
+                            Безопасность
+                        </button>
+
+
+                        <button
+                            class="settings-nav-button"
+                            type="button"
+                            data-settings-section="rules"
+                        >
+                            <span>≡</span>
+                            Правила
+                        </button>
+
+
+                        <button
+                            class="settings-nav-button"
+                            type="button"
+                            data-settings-section="about"
+                        >
+                            <span>?</span>
+                            О NOBODY
+                        </button>
+
+                    </aside>
+
+
+                    <div class="settings-content">
+
+                        <!-- APPEARANCE -->
+
+                        <section
+                            class="settings-section active"
+                            data-settings-content="appearance"
+                        >
+
+                            <div class="settings-section-heading">
+
+                                <h2>
+                                    Внешний вид
+                                </h2>
+
+                                <p>
+                                    Настрой интерфейс под себя.
+                                </p>
+
+                            </div>
+
+
+                            <div class="settings-card">
+
+                                <div class="setting-row">
+
+                                    <div class="setting-info">
+
+                                        <strong>
+                                            Тема
+                                        </strong>
+
+                                        <span>
+                                            Светлая, тёмная или
+                                            системная.
+                                        </span>
+
+                                    </div>
+
+
+                                    <select
+                                        id="themeSelect"
+                                        class="settings-select"
+                                    >
+
+                                        <option value="system">
+                                            🌓 Системная
+                                        </option>
+
+                                        <option value="light">
+                                            ☀️ Светлая
+                                        </option>
+
+                                        <option value="dark">
+                                            🌙 Тёмная
+                                        </option>
+
+                                    </select>
+
+                                </div>
+
+
+                                <div class="setting-row">
+
+                                    <div class="setting-info">
+
+                                        <strong>
+                                            Компактный интерфейс
+                                        </strong>
+
+                                        <span>
+                                            Меньше отступов и
+                                            элементов на экране.
+                                        </span>
+
+                                    </div>
+
+                                    <label class="toggle">
+
+                                        <input
+                                            id="compactModeToggle"
+                                            type="checkbox"
+                                        >
+
+                                        <span class="toggle-slider"></span>
+
+                                    </label>
+
+                                </div>
+
+
+                                <div class="setting-row">
+
+                                    <div class="setting-info">
+
+                                        <strong>
+                                            Анимации
+                                        </strong>
+
+                                        <span>
+                                            Плавные переходы
+                                            интерфейса.
+                                        </span>
+
+                                    </div>
+
+                                    <label class="toggle">
+
+                                        <input
+                                            id="animationsToggle"
+                                            type="checkbox"
+                                            checked
+                                        >
+
+                                        <span class="toggle-slider"></span>
+
+                                    </label>
+
+                                </div>
+
+                            </div>
+
+                        </section>
+
+
+                        <!-- ACCOUNT -->
+
+                        <section
+                            class="settings-section"
+                            data-settings-content="account"
+                        >
+
+                            <div class="settings-section-heading">
+
+                                <h2>
+                                    Аккаунт
+                                </h2>
+
+                                <p>
+                                    Основные данные твоего
+                                    NOBODY-аккаунта.
+                                </p>
+
+                            </div>
+
+
+                            <div class="settings-card">
+
+                                <div class="account-setting-preview">
+
+                                    <div
+                                        id="settingsAvatar"
+                                        class="avatar large"
+                                    >
+                                        ?
+                                    </div>
+
+                                    <div>
+
+                                        <strong
+                                            id="settingsUsername"
+                                        >
+                                            @Nobody
+                                        </strong>
+
+                                        <span
+                                            id="settingsUserId"
+                                        >
+                                            user_XXXXXXXXXX
+                                        </span>
+
+                                    </div>
+
+                                </div>
+
+
+                                <div class="setting-row">
+
+                                    <div class="setting-info">
+
+                                        <strong>
+                                            Ник
+                                        </strong>
+
+                                        <span>
+                                            Ник уникален внутри
+                                            NOBODY.
+                                        </span>
+
+                                    </div>
+
+                                    <button
+                                        id="changeUsernameButton"
+                                        class="secondary-button"
+                                        type="button"
+                                    >
+                                        Изменить
+                                    </button>
+
+                                </div>
+
+
+                                <div class="setting-row">
+
+                                    <div class="setting-info">
+
+                                        <strong>
+                                            Пароль
+                                        </strong>
+
+                                        <span>
+                                            Пароль не отображается
+                                            в интерфейсе.
+                                        </span>
+
+                                    </div>
+
+                                    <button
+                                        id="changePasswordButton"
+                                        class="secondary-button"
+                                        type="button"
+                                    >
+                                        Изменить
+                                    </button>
+
+                                </div>
+
+
+                                <div class="setting-row danger-row">
+
+                                    <div class="setting-info">
+
+                                        <strong>
+                                            Удаление аккаунта
+                                        </strong>
+
+                                        <span>
+                                            Это действие требует
+                                            отдельного подтверждения.
+                                        </span>
+
+                                    </div>
+
+                                    <button
+                                        id="deleteAccountButton"
+                                        class="danger-button"
+                                        type="button"
+                                    >
+                                        Удалить
+                                    </button>
+
+                                </div>
+
+                            </div>
+
+                        </section>
+
+
+                        <!-- PRIVACY -->
+
+                        <section
+                            class="settings-section"
+                            data-settings-content="privacy"
+                        >
+
+                            <div class="settings-section-heading">
+
+                                <h2>
+                                    Приватность
+                                </h2>
+
+                                <p>
+                                    Управляй тем, что могут видеть
+                                    другие пользователи.
+                                </p>
+
+                            </div>
+
+
+                            <div class="settings-card">
+
+                                <div class="setting-row">
+
+                                    <div class="setting-info">
+
+                                        <strong>
+                                            Кто может писать мне
+                                        </strong>
+
+                                        <span>
+                                            Настрой входящие
+                                            сообщения.
+                                        </span>
+
+                                    </div>
+
+                                    <select
+                                        id="messagePrivacySelect"
+                                        class="settings-select"
+                                    >
+
+                                        <option value="everyone">
+                                            Все
+                                        </option>
+
+                                        <option value="followers">
+                                            Подписчики
+                                        </option>
+
+                                        <option value="nobody">
+                                            Никто
+                                        </option>
+
+                                    </select>
+
+                                </div>
+
+
+                                <div class="setting-row">
+
+                                    <div class="setting-info">
+
+                                        <strong>
+                                            Показывать профиль
+                                            в поиске
+                                        </strong>
+
+                                        <span>
+                                            Другие смогут найти
+                                            твой аккаунт.
+                                        </span>
+
+                                    </div>
+
+                                    <label class="toggle">
+
+                                        <input
+                                            id="profileDiscoverableToggle"
+                                            type="checkbox"
+                                            checked
+                                        >
+
+                                        <span class="toggle-slider"></span>
+
+                                    </label>
+
+                                </div>
+
+
+                                <div class="setting-row">
+
+                                    <div class="setting-info">
+
+                                        <strong>
+                                            Разрешить приглашения
+                                            в комнаты
+                                        </strong>
+
+                                    </div>
+
+                                    <label class="toggle">
+
+                                        <input
+                                            id="roomInvitesToggle"
+                                            type="checkbox"
+                                            checked
+                                        >
+
+                                        <span class="toggle-slider"></span>
+
+                                    </label>
+
+                                </div>
+
+                            </div>
+
+                        </section>
+
+
+                        <!-- NOTIFICATIONS -->
+
+                        <section
+                            class="settings-section"
+                            data-settings-content="notifications"
+                        >
+
+                            <div class="settings-section-heading">
+
+                                <h2>
+                                    Уведомления
+                                </h2>
+
+                                <p>
+                                    Выбери, о чём NOBODY будет
+                                    тебе сообщать.
+                                </p>
+
+                            </div>
+
+
+                            <div class="settings-card">
+
+                                <div class="setting-row">
+
+                                    <div class="setting-info">
+
+                                        <strong>
+                                            Лайки
+                                        </strong>
+
+                                        <span>
+                                            Уведомлять о реакциях
+                                            на твои посты.
+                                        </span>
+
+                                    </div>
+
+                                    <label class="toggle">
+
+                                        <input
+                                            id="likeNotificationsToggle"
+                                            type="checkbox"
+                                            checked
+                                        >
+
+                                        <span class="toggle-slider"></span>
+
+                                    </label>
+
+                                </div>
+
+
+                                <div class="setting-row">
+
+                                    <div class="setting-info">
+
+                                        <strong>
+                                            Комментарии
+                                        </strong>
+
+                                    </div>
+
+                                    <label class="toggle">
+
+                                        <input
+                                            id="commentNotificationsToggle"
+                                            type="checkbox"
+                                            checked
+                                        >
+
+                                        <span class="toggle-slider"></span>
+
+                                    </label>
+
+                                </div>
+
+
+                                <div class="setting-row">
+
+                                    <div class="setting-info">
+
+                                        <strong>
+                                            Новые подписчики
+                                        </strong>
+
+                                    </div>
+
+                                    <label class="toggle">
+
+                                        <input
+                                            id="followNotificationsToggle"
+                                            type="checkbox"
+                                            checked
+                                        >
+
+                                        <span class="toggle-slider"></span>
+
+                                    </label>
+
+                                </div>
+
+
+                                <div class="setting-row">
+
+                                    <div class="setting-info">
+
+                                        <strong>
+                                            Сообщения
+                                        </strong>
+
+                                    </div>
+
+                                    <label class="toggle">
+
+                                        <input
+                                            id="messageNotificationsToggle"
+                                            type="checkbox"
+                                            checked
+                                        >
+
+                                        <span class="toggle-slider"></span>
+
+                                    </label>
+
+                                </div>
+
+                            </div>
+
+                        </section>
+
+
+                        <!-- SAFETY -->
+
+                        <section
+                            class="settings-section"
+                            data-settings-content="safety"
+                        >
+
+                            <div class="settings-section-heading">
+
+                                <h2>
+                                    Безопасность
+                                </h2>
+
+                                <p>
+                                    Инструменты защиты твоего
+                                    аккаунта и пространства.
+                                </p>
+
+                            </div>
+
+
+                            <div class="settings-card">
+
+                                <div class="setting-row">
+
+                                    <div class="setting-info">
+
+                                        <strong>
+                                            Заблокированные
+                                        </strong>
+
+                                        <span>
+                                            Управление пользователями,
+                                            которых ты заблокировал.
+                                        </span>
+
+                                    </div>
+
+                                    <button
+                                        id="blockedUsersButton"
+                                        class="secondary-button"
+                                        type="button"
+                                    >
+                                        Открыть
+                                    </button>
+
+                                </div>
+
+
+                                <div class="setting-row">
+
+                                    <div class="setting-info">
+
+                                        <strong>
+                                            Скрытые аккаунты
+                                        </strong>
+
+                                        <span>
+                                            Пользователи, которых ты
+                                            не хочешь видеть в ленте.
+                                        </span>
+
+                                    </div>
+
+                                    <button
+                                        id="mutedUsersButton"
+                                        class="secondary-button"
+                                        type="button"
+                                    >
+                                        Открыть
+                                    </button>
+
+                                </div>
+
+
+                                <div class="setting-row">
+
+                                    <div class="setting-info">
+
+                                        <strong>
+                                            Активные сессии
+                                        </strong>
+
+                                        <span>
+                                            В будущей онлайн-версии
+                                            здесь будут устройства.
+                                        </span>
+
+                                    </div>
+
+                                    <button
+                                        id="sessionsButton"
+                                        class="secondary-button"
+                                        type="button"
+                                    >
+                                        Открыть
+                                    </button>
+
+                                </div>
+
+                            </div>
+
+                        </section>
+
+
+                        <!-- RULES -->
+
+                        <section
+                            class="settings-section"
+                            data-settings-content="rules"
+                        >
+
+                            <div class="settings-section-heading">
+
+                                <h2>
+                                    Правила NOBODY
+                                </h2>
+
+                                <p>
+                                    Анонимность не означает
+                                    отсутствие ответственности.
+                                </p>
+
+                            </div>
+
+
+                            <div
+                                id="settingsRules"
+                                class="rules-card"
+                            >
+
+                                <ol>
+
+                                    <li>
+                                        Не публикуй реальные
+                                        личные данные других людей.
+                                    </li>
+
+                                    <li>
+                                        Не раскрывай личность
+                                        пользователя против его воли.
+                                    </li>
+
+                                    <li>
+                                        Запрещены доксинг,
+                                        угрозы, травля и преследование.
+                                    </li>
+
+                                    <li>
+                                        Не выдавай себя за реального
+                                        человека с целью обмана.
+                                    </li>
+
+                                    <li>
+                                        Фейковая личность допустима,
+                                        если она не используется
+                                        для причинения вреда.
+                                    </li>
+
+                                    <li>
+                                        Не используй платформу для
+                                        опасных или незаконных действий.
+                                    </li>
+
+                                    <li>
+                                        Жалобы рассматриваются
+                                        системой модерации.
+                                    </li>
+
+                                    <li>
+                                        Администрация может удалять
+                                        контент, нарушающий правила.
+                                    </li>
+
+                                </ol>
+
+                            </div>
+
+                        </section>
+
+
+                        <!-- ABOUT -->
+
+                        <section
+                            class="settings-section"
+                            data-settings-content="about"
+                        >
+
+                            <div class="settings-section-heading">
+
+                                <h2>
+                                    О NOBODY
+                                </h2>
+
+                                <p>
+                                    Anonymous social world.
+                                </p>
+
+                            </div>
+
+
+                            <div class="about-card">
+
+                                <div class="about-logo">
+                                    N
+                                </div>
+
+                                <h2>
+                                    NOBODY
+                                </h2>
+
+                                <span class="version-label">
+                                    Version 0.1
+                                </span>
+
+                                <p>
+                                    Проект развивается поэтапно.
+                                    В будущем здесь появятся
+                                    полноценные социальные функции,
+                                    комнаты, игры, персонажи
+                                    и виртуальный мир.
+                                </p>
+
+                                <div class="about-links">
+
+                                    <button
+                                        id="aboutRulesButton"
+                                        class="text-button"
+                                        type="button"
+                                    >
+                                        Правила
+                                    </button>
+
+                                    <button
+                                        id="aboutPrivacyButton"
+                                        class="text-button"
+                                        type="button"
+                                    >
+                                        Приватность
+                                    </button>
+
+                                </div>
+
+                            </div>
+
+                        </section>
+
+                    </div>
+
+                </div>
+
+            </section>
+
+
+
+            <!-- =============================================
+                 OWNER PANEL
+            ============================================== -->
+
+            <section
+                id="ownerPage"
+                class="page hidden"
+                data-page-section="owner"
+            >
+
+                <div class="page-header owner-header">
+
+                    <div>
+
+                        <div class="page-eyebrow">
+                            PRIVATE ADMINISTRATION
+                        </div>
+
+                        <h1 class="page-title">
+                            👑 Owner Panel
+                        </h1>
+
+                        <p class="page-subtitle">
+                            Управление платформой и модерация.
+                        </p>
+
+                    </div>
+
+
+                    <div class="owner-security-badge">
+                        OWNER
+                    </div>
+
+                </div>
+
+
+                <div class="owner-warning">
+
+                    <strong>
+                        Закрытая зона.
+                    </strong>
+
+                    <span>
+                        Реальные права администратора должны
+                        проверяться сервером. Клиентский HTML
+                        никогда не является доказательством
+                        права доступа.
+                    </span>
+
+                </div>
+
+
+                <div
+                    id="ownerStats"
+                    class="owner-stat-grid"
+                >
+
+                    <div class="owner-stat-card">
+
+                        <span class="owner-stat-icon">
+                            ◎
+                        </span>
+
+                        <strong
+                            id="ownerUsersCount"
+                        >
+                            0
+                        </strong>
+
+                        <span>
+                            Пользователей
+                        </span>
+
+                    </div>
+
+
+                    <div class="owner-stat-card">
+
+                        <span class="owner-stat-icon">
+                            □
+                        </span>
+
+                        <strong
+                            id="ownerPostsCount"
+                        >
+                            0
+                        </strong>
+
+                        <span>
+                            Постов
+                        </span>
+
+                    </div>
+
+
+                    <div class="owner-stat-card">
+
+                        <span class="owner-stat-icon">
+                            ◇
+                        </span>
+
+                        <strong
+                            id="ownerMessagesCount"
+                        >
+                            0
+                        </strong>
+
+                        <span>
+                            Сообщений
+                        </span>
+
+                    </div>
+
+
+                    <div class="owner-stat-card">
+
+                        <span class="owner-stat-icon">
+                            ⚑
+                        </span>
+
+                        <strong
+                            id="ownerReportsCount"
+                        >
+                            0
+                        </strong>
+
+                        <span>
+                            Жалоб
+                        </span>
+
+                    </div>
+
+                </div>
+
+
+                <div class="owner-tools">
+
+                    <button
+                        class="owner-tool"
+                        type="button"
+                        data-owner-tool="users"
+                    >
+
+                        <span>
+                            ◎
+                        </span>
+
+                        <strong>
+                            Пользователи
+                        </strong>
+
+                        <small>
+                            Поиск и управление аккаунтами
+                        </small>
+
+                    </button>
+
+
+                    <button
+                        class="owner-tool"
+                        type="button"
+                        data-owner-tool="posts"
+                    >
+
+                        <span>
+                            □
+                        </span>
+
+                        <strong>
+                            Контент
+                        </strong>
+
+                        <small>
+                            Посты, видео и комментарии
+                        </small>
+
+                    </button>
+
+
+                    <button
+                        class="owner-tool"
+                        type="button"
+                        data-owner-tool="reports"
+                    >
+
+                        <span>
+                            ⚑
+                        </span>
+
+                        <strong>
+                            Жалобы
+                        </strong>
+
+                        <small>
+                            Очередь модерации
+                        </small>
+
+                    </button>
+
+
+                    <button
+                        class="owner-tool"
+                        type="button"
+                        data-owner-tool="rooms"
+                    >
+
+                        <span>
+                            ▣
+                        </span>
+
+                        <strong>
+                            Комнаты
+                        </strong>
+
+                        <small>
+                            Управление пространствами
+                        </small>
+
+                    </button>
+
+
+                    <button
+                        class="owner-tool"
+                        type="button"
+                        data-owner-tool="games"
+                    >
+
+                        <span>
+                            ♜
+                        </span>
+
+                        <strong>
+                            Игры
+                        </strong>
+
+                        <small>
+                            Управление игровыми режимами
+                        </small>
+
+                    </button>
+
+
+                    <button
+                        class="owner-tool"
+                        type="button"
+                        data-owner-tool="system"
+                    >
+
+                        <span>
+                            ⚙
+                        </span>
+
+                        <strong>
+                            Система
+                        </strong>
+
+                        <small>
+                            Настройки платформы
+                        </small>
+
+                    </button>
+
+                </div>
+
+
+                <div class="owner-log-section">
+
+                    <div class="section-header">
+
+                        <div>
+
+                            <h2>
+                                Последние действия
+                            </h2>
+
+                            <p>
+                                Внутренний журнал платформы.
+                            </p>
+
+                        </div>
+
+                        <button
+                            id="refreshOwnerLogButton"
+                            class="icon-action-button"
+                            type="button"
+                        >
+                            ↻
+                        </button>
+
+                    </div>
+
+
+                    <div
+                        id="ownerActivityLog"
+                        class="owner-log"
+                    ></div>
+
+                </div>
+
+            </section>
+
+        </main>
+
+    </div>
+
+
+
+    <!-- =====================================================
+         MOBILE BOTTOM NAVIGATION
+    ====================================================== -->
+
+    <nav
+        id="mobileBottomNav"
+        class="mobile-bottom-nav hidden"
+        aria-label="Мобильная навигация"
+    >
+
+        <button
+            class="mobile-nav-button active"
+            type="button"
+            data-page="home"
+        >
+
+            <span>
+                ⌂
+            </span>
+
+            <small>
+                Главная
+            </small>
+
+        </button>
+
+
+        <button
+            class="mobile-nav-button"
+            type="button"
+            data-page="explore"
+        >
+
+            <span>
+                ⌕
+            </span>
+
+            <small>
+                Поиск
+            </small>
+
+        </button>
+
+
+        <button
+            class="mobile-nav-create"
+            type="button"
+            data-action="create"
+            aria-label="Создать"
+        >
+            ＋
+        </button>
+
+
+        <button
+            class="mobile-nav-button"
+            type="button"
+            data-page="messages"
+        >
+
+            <span>
+                ◇
+            </span>
+
+            <small>
+                ЛС
+            </small>
+
+        </button>
+
+
+        <button
+            class="mobile-nav-button"
+            type="button"
+            data-page="profile"
+        >
+
+            <span>
+                ◎
+            </span>
+
+            <small>
+                Профиль
+            </small>
+
+        </button>
+
+    </nav>
+
+
+
+    <!-- =====================================================
+         POST CREATION MODAL
+    ====================================================== -->
+
+    <div
+        id="postModal"
+        class="modal hidden"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="postModalTitle"
+    >
+
+        <div class="modal-backdrop"></div>
+
+
+        <div class="modal-card post-modal-card">
+
+            <header class="modal-header">
+
+                <div>
+
+                    <div class="modal-eyebrow">
+                        CREATE
+                    </div>
+
+                    <h2 id="postModalTitle">
+                        Новый пост
+                    </h2>
+
+                </div>
+
+
+                <button
+                    id="closePostModal"
+                    class="modal-close"
+                    type="button"
+                    aria-label="Закрыть"
+                >
+                    ×
+                </button>
+
+            </header>
+
+
+            <form
+                id="postForm"
+                class="post-form"
+            >
+
+                <div class="post-author-preview">
+
+                    <div
+                        id="postModalAvatar"
+                        class="avatar"
+                    >
+                        ?
+                    </div>
+
+                    <div>
+
+                        <strong
+                            id="postModalUsername"
+                        >
+                            @Nobody
+                        </strong>
+
+                        <span>
+                            Публичный пост
+                        </span>
+
+                    </div>
+
+                </div>
+
+
+                <textarea
+                    id="postText"
+                    class="post-textarea"
+                    maxlength="5000"
+                    rows="7"
+                    placeholder="Что происходит?"
+                ></textarea>
+
+
+                <div class="post-character-counter">
+
+                    <span>
+                        Можно написать что угодно.
+                    </span>
+
+                    <span>
+                        <strong id="postCharacterCount">
+                            0
+                        </strong>
+                        / 5000
+                    </span>
+
+                </div>
+
+
+                <div class="post-attachments">
+
+                    <button
+                        id="attachImageButton"
+                        class="attachment-button"
+                        type="button"
+                    >
+                        ▧
+                        <span>
+                            Фото
+                        </span>
+                    </button>
+
+
+                    <button
+                        id="attachVideoButton"
+                        class="attachment-button"
+                        type="button"
+                    >
+                        ▶
+                        <span>
+                            Видео
+                        </span>
+                    </button>
+
+
+                    <button
+                        id="attachGifButton"
+                        class="attachment-button"
+                        type="button"
+                    >
+                        GIF
+                        <span>
+                            GIF
+                        </span>
+                    </button>
+
+
+                    <button
+                        id="addPollButton"
+                        class="attachment-button"
+                        type="button"
+                    >
+                        ≡
+                        <span>
+                            Опрос
+                        </span>
+                    </button>
+
+                </div>
+
+
+                <div
+                    id="postMediaPreview"
+                    class="media-preview hidden"
+                ></div>
+
+
+                <div class="modal-footer">
+
+                    <button
+                        id="cancelPostButton"
+                        class="secondary-button"
+                        type="button"
+                    >
+                        Отмена
+                    </button>
+
+                    <button
+                        id="publishPostButton"
+                        class="primary-button"
+                        type="submit"
+                    >
+                        Опубликовать
+                    </button>
+
+                </div>
+
+            </form>
+
+        </div>
+
+    </div>
+
+
+
+    <!-- =====================================================
+         STORY CREATION MODAL
+    ====================================================== -->
+
+    <div
+        id="storyModal"
+        class="modal hidden"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="storyModalTitle"
+    >
+
+        <div class="modal-backdrop"></div>
+
+
+        <div class="modal-card">
+
+            <header class="modal-header">
+
+                <h2 id="storyModalTitle">
+                    Новая история
+                </h2>
+
+                <button
+                    id="closeStoryModal"
+                    class="modal-close"
+                    type="button"
+                >
+                    ×
+                </button>
+
+            </header>
+
+
+            <form id="storyForm">
+
+                <textarea
+                    id="storyText"
+                    class="post-textarea"
+                    maxlength="500"
+                    rows="5"
+                    placeholder="Напиши что-нибудь..."
+                ></textarea>
+
+
+                <div class="modal-footer">
+
+                    <button
+                        class="secondary-button"
+                        type="button"
+                        data-close-modal="storyModal"
+                    >
+                        Отмена
+                    </button>
+
+                    <button
+                        class="primary-button"
+                        type="submit"
+                    >
+                        Опубликовать
+                    </button>
+
+                </div>
+
+            </form>
+
+        </div>
+
+    </div>
+
+
+
+    <!-- =====================================================
+         USER PROFILE MODAL
+    ====================================================== -->
+
+    <div
+        id="userProfileModal"
+        class="modal hidden"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="userProfileModalTitle"
+    >
+
+        <div class="modal-backdrop"></div>
+
+
+        <div class="modal-card user-profile-modal">
+
+            <button
+                class="modal-close floating-close"
+                type="button"
+                data-close-modal="userProfileModal"
+                aria-label="Закрыть"
+            >
+                ×
+            </button>
+
+
+            <div
+                id="userProfileModalCover"
+                class="modal-profile-cover"
+            ></div>
+
+
+            <div class="modal-profile-content">
+
+                <div
+                    id="modalUserAvatar"
+                    class="profile-avatar"
+                >
+                    ?
+                </div>
+
+
+                <h2
+                    id="userProfileModalTitle"
+                    class="profile-name"
+                >
+                    @Nobody
+                </h2>
+
+
+                <div
+                    id="modalUserAnonymousId"
+                    class="profile-id"
+                >
+                    user_XXXXXXXXXX
+                </div>
+
+
+                <p
+                    id="modalUserBio"
+                    class="profile-bio"
+                ></p>
+
+
+                <div class="profile-stats">
+
+                    <div class="profile-stat static">
+
+                        <strong
+                            id="modalUserPosts"
+                        >
+                            0
+                        </strong>
+
+                        <span>
+                            постов
+                        </span>
+
+                    </div>
+
+
+                    <div class="profile-stat static">
+
+                        <strong
+                            id="modalUserFollowers"
+                        >
+                            0
+                        </strong>
+
+                        <span>
+                            подписчиков
+                        </span>
+
+                    </div>
+
+
+                    <div class="profile-stat static">
+
+                        <strong
+                            id="modalUserFollowing"
+                        >
+                            0
+                        </strong>
+
+                        <span>
+                            подписок
+                        </span>
+
+                    </div>
+
+                </div>
+
+
+                <div class="modal-profile-actions">
+
+                    <button
+                        id="modalFollowButton"
+                        class="primary-button"
+                        type="button"
+                    >
+                        Подписаться
+                    </button>
+
+
+                    <button
+                        id="modalMessageButton"
+                        class="secondary-button"
+                        type="button"
+                    >
+                        Написать
+                    </button>
+
+
+                    <button
+                        id="modalProfileMoreButton"
+                        class="icon-action-button"
+                        type="button"
+                    >
+                        ···
+                    </button>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+
+
+    <!-- =====================================================
+         EDIT PROFILE MODAL
+    ====================================================== -->
+
+    <div
+        id="editProfileModal"
+        class="modal hidden"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="editProfileTitle"
+    >
+
+        <div class="modal-backdrop"></div>
+
+
+        <div class="modal-card">
+
+            <header class="modal-header">
+
+                <h2 id="editProfileTitle">
+                    Изменить профиль
+                </h2>
+
+                <button
+                    class="modal-close"
+                    type="button"
+                    data-close-modal="editProfileModal"
+                >
+                    ×
+                </button>
+
+            </header>
+
+
+            <form id="editProfileForm">
+
+                <div class="profile-edit-avatar">
+
+                    <div
+                        id="editProfileAvatar"
+                        class="profile-avatar"
+                    >
+                        ?
+                    </div>
+
+                    <button
+                        id="changeAvatarButton"
+                        class="secondary-button"
+                        type="button"
+                    >
+                        Изменить аватар
+                    </button>
+
+                </div>
+
+
+                <div class="form-field">
+
+                    <label
+                        class="form-label"
+                        for="editBioInput"
+                    >
+                        О себе
+                    </label>
+
+                    <textarea
+                        id="editBioInput"
+                        class="form-input textarea-input"
+                        maxlength="300"
+                        rows="5"
+                        placeholder="Расскажи что-нибудь о себе..."
+                    ></textarea>
+
+                </div>
+
+
+                <div class="form-field">
+
+                    <label
+                        class="form-label"
+                        for="editDisplayNameInput"
+                    >
+                        Отображаемое имя
+                    </label>
+
+                    <input
+                        id="editDisplayNameInput"
+                        class="form-input"
+                        type="text"
+                        maxlength="40"
+                        placeholder="Имя"
+                    >
+
+                </div>
+
+
+                <div class="modal-footer">
+
+                    <button
+                        class="secondary-button"
+                        type="button"
+                        data-close-modal="editProfileModal"
+                    >
+                        Отмена
+                    </button>
+
+                    <button
+                        class="primary-button"
+                        type="submit"
+                    >
+                        Сохранить
+                    </button>
+
+                </div>
+
+            </form>
+
+        </div>
+
+    </div>
+
+
+
+    <!-- =====================================================
+         RULES MODAL
+    ====================================================== -->
+
+    <div
+        id="rulesModal"
+        class="modal hidden"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="rulesModalTitle"
+    >
+
+        <div class="modal-backdrop"></div>
+
+
+        <div class="modal-card rules-modal-card">
+
+            <header class="modal-header">
+
+                <div>
+
+                    <div class="modal-eyebrow">
+                        NOBODY
+                    </div>
+
+                    <h2 id="rulesModalTitle">
+                        📜 Правила
+                    </h2>
+
+                </div>
+
+
+                <button
+                    class="modal-close"
+                    type="button"
+                    data-close-modal="rulesModal"
+                >
+                    ×
+                </button>
+
+            </header>
+
+
+            <div class="rules-content">
+
+                <div class="rule-item">
+
+                    <span class="rule-number">
+                        01
+                    </span>
+
+                    <div>
+
+                        <strong>
+                            Псевдонимы разрешены
+                        </strong>
+
+                        <p>
+                            Ты можешь использовать полностью
+                            вымышленную личность.
+                        </p>
+
+                    </div>
+
+                </div>
+
+
+                <div class="rule-item">
+
+                    <span class="rule-number">
+                        02
+                    </span>
+
+                    <div>
+
+                        <strong>
+                            Не раскрывай чужую личность
+                        </strong>
+
+                        <p>
+                            Нельзя публиковать реальные данные
+                            другого пользователя без его
+                            согласия.
+                        </p>
+
+                    </div>
+
+                </div>
+
+
+                <div class="rule-item">
+
+                    <span class="rule-number">
+                        03
+                    </span>
+
+                    <div>
+
+                        <strong>
+                            Без доксинга
+                        </strong>
+
+                        <p>
+                            Запрещено собирать и распространять
+                            личную информацию людей.
+                        </p>
+
+                    </div>
+
+                </div>
+
+
+                <div class="rule-item">
+
+                    <span class="rule-number">
+                        04
+                    </span>
+
+                    <div>
+
+                        <strong>
+                            Без угроз и травли
+                        </strong>
+
+                        <p>
+                            Анонимность не даёт права преследовать
+                            или запугивать других.
+                        </p>
+
+                    </div>
+
+                </div>
+
+
+                <div class="rule-item">
+
+                    <span class="rule-number">
+                        05
+                    </span>
+
+                    <div>
+
+                        <strong>
+                            Фейковая личность не должна вредить
+                        </strong>
+
+                        <p>
+                            Вымышленный образ допустим, но
+                            выдавать себя за другого человека
+                            ради обмана нельзя.
+                        </p>
+
+                    </div>
+
+                </div>
+
+
+                <div class="rule-item">
+
+                    <span class="rule-number">
+                        06
+                    </span>
+
+                    <div>
+
+                        <strong>
+                            Уважай пространство других
+                        </strong>
+
+                        <p>
+                            Комнаты, сообщения, комментарии
+                            и игровые пространства должны
+                            оставаться безопасными.
+                        </p>
+
+                    </div>
+
+                </div>
+
+
+                <div class="rule-item">
+
+                    <span class="rule-number">
+                        07
+                    </span>
+
+                    <div>
+
+                        <strong>
+                            Модерация существует
+                        </strong>
+
+                        <p>
+                            Нарушающий правила контент может
+                            быть удалён администрацией.
+                        </p>
+
+                    </div>
+
+                </div>
+
+
+                <div class="rule-item">
+
+                    <span class="rule-number">
+                        08
+                    </span>
+
+                    <div>
+
+                        <strong>
+                            Анонимность ≠ безнаказанность
+                        </strong>
+
+                        <p>
+                            NOBODY создан для свободы общения,
+                            а не для причинения вреда другим.
+                        </p>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+
+            <div class="rules-footer">
+
+                <span>
+                    Версия правил: 0.1
+                </span>
+
+                <button
+                    class="primary-button"
+                    type="button"
+                    data-close-modal="rulesModal"
+                >
+                    Понятно
+                </button>
+
+            </div>
+
+        </div>
+
+    </div>
+
+
+
+    <!-- =====================================================
+         ROOM CREATION MODAL
+    ====================================================== -->
+
+    <div
+        id="roomModal"
+        class="modal hidden"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="roomModalTitle"
+    >
+
+        <div class="modal-backdrop"></div>
+
+
+        <div class="modal-card">
+
+            <header class="modal-header">
+
+                <h2 id="roomModalTitle">
+                    Создать комнату
+                </h2>
+
+                <button
+                    class="modal-close"
+                    type="button"
+                    data-close-modal="roomModal"
+                >
+                    ×
+                </button>
+
+            </header>
+
+
+            <form id="roomForm">
+
+                <div class="form-field">
+
+                    <label
+                        class="form-label"
+                        for="roomNameInput"
+                    >
+                        Название
+                    </label>
+
+                    <input
+                        id="roomNameInput"
+                        class="form-input"
+                        type="text"
+                        maxlength="50"
+                        placeholder="Например: Музыка ночью"
+                        required
+                    >
+
+                </div>
+
+
+                <div class="form-field">
+
+                    <label
+                        class="form-label"
+                        for="roomDescriptionInput"
+                    >
+                        Описание
+                    </label>
+
+                    <textarea
+                        id="roomDescriptionInput"
+                        class="form-input textarea-input"
+                        maxlength="300"
+                        rows="4"
+                        placeholder="О чём эта комната?"
+                    ></textarea>
+
+                </div>
+
+
+                <div class="form-field">
+
+                    <label
+                        class="form-label"
+                        for="roomVisibilitySelect"
+                    >
+                        Видимость
+                    </label>
+
+                    <select
+                        id="roomVisibilitySelect"
+                        class="settings-select full-width"
+                    >
+
+                        <option value="public">
+                            🌐 Публичная
+                        </option>
+
+                        <option value="followers">
+                            ◇ Только подписчики
+                        </option>
+
+                        <option value="private">
+                            🔒 Приватная
+                        </option>
+
+                    </select>
+
+                </div>
+
+
+                <div class="modal-footer">
+
+                    <button
+                        class="secondary-button"
+                        type="button"
+                        data-close-modal="roomModal"
+                    >
+                        Отмена
+                    </button>
+
+                    <button
+                        class="primary-button"
+                        type="submit"
+                    >
+                        Создать
+                    </button>
+
+                </div>
+
+            </form>
+
+        </div>
+
+    </div>
+
+
+
+    <!-- =====================================================
+         CHARACTER CREATION MODAL
+    ====================================================== -->
+
+    <div
+        id="characterModal"
+        class="modal hidden"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="characterModalTitle"
+    >
+
+        <div class="modal-backdrop"></div>
+
+
+        <div class="modal-card character-modal-card">
+
+            <header class="modal-header">
+
+                <div>
+
+                    <div class="modal-eyebrow">
+                        CHARACTER CREATOR
+                    </div>
+
+                    <h2 id="characterModalTitle">
+                        Создать персонажа
+                    </h2>
+
+                </div>
+
+                <button
+                    class="modal-close"
+                    type="button"
+                    data-close-modal="characterModal"
+                >
+                    ×
+                </button>
+
+            </header>
+
+
+            <form id="characterForm">
+
+                <div class="character-preview">
+
+                    <div
+                        id="characterPreviewAvatar"
+                        class="character-preview-avatar"
+                    >
+                        ?
+                    </div>
+
+                </div>
+
+
+                <div class="form-field">
+
+                    <label
+                        class="form-label"
+                        for="characterNameInput"
+                    >
+                        Имя персонажа
+                    </label>
+
+                    <input
+                        id="characterNameInput"
+                        class="form-input"
+                        type="text"
+                        maxlength="30"
+                        placeholder="Например: Лея"
+                        required
+                    >
+
+                </div>
+
+
+                <div class="form-field">
+
+                    <label
+                        class="form-label"
+                        for="characterDescriptionInput"
+                    >
+                        Описание
+                    </label>
+
+                    <textarea
+                        id="characterDescriptionInput"
+                        class="form-input textarea-input"
+                        maxlength="500"
+                        rows="5"
+                        placeholder="Кто этот персонаж?"
+                    ></textarea>
+
+                </div>
+
+
+                <div class="character-creator-grid">
+
+                    <div class="form-field">
+
+                        <label
+                            class="form-label"
+                            for="characterTypeSelect"
+                        >
+                            Тип
+                        </label>
+
+                        <select
+                            id="characterTypeSelect"
+                            class="settings-select full-width"
+                        >
+
+                            <option value="human">
+                                Человек
+                            </option>
+
+                            <option value="fantasy">
+                                Фэнтези
+                            </option>
+
+                            <option value="robot">
+                                Робот
+                            </option>
+
+                            <option value="animal">
+                                Животное
+                            </option>
+
+                            <option value="other">
+                                Другое
+                            </option>
+
+                        </select>
+
+                    </div>
+
+
+                    <div class="form-field">
+
+                        <label
+                            class="form-label"
+                            for="characterMoodSelect"
+                        >
+                            Характер
+                        </label>
+
+                        <select
+                            id="characterMoodSelect"
+                            class="settings-select full-width"
+                        >
+
+                            <option value="calm">
+                                Спокойный
+                            </option>
+
+                            <option value="funny">
+                                Весёлый
+                            </option>
+
+                            <option value="serious">
+                                Серьёзный
+                            </option>
+
+                            <option value="mysterious">
+                                Загадочный
+                            </option>
+
+                            <option value="random">
+                                Случайный
+                            </option>
+
+                        </select>
+
+                    </div>
+
+                </div>
+
+
+                <div class="modal-footer">
+
+                    <button
+                        class="secondary-button"
+                        type="button"
+                        data-close-modal="characterModal"
+                    >
+                        Отмена
+                    </button>
+
+                    <button
+                        class="primary-button"
+                        type="submit"
+                    >
+                        Создать персонажа
+                    </button>
+
+                </div>
+
+            </form>
+
+        </div>
+
+    </div>
+
+
+
+    <!-- =====================================================
+         GAME MODAL
+    ====================================================== -->
+
+    <div
+        id="gameModal"
+        class="modal hidden"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="gameModalTitle"
+    >
+
+        <div class="modal-backdrop"></div>
+
+
+        <div class="modal-card game-modal-card">
+
+            <header class="modal-header">
+
+                <div>
+
+                    <div
+                        id="gameModalEyebrow"
+                        class="modal-eyebrow"
+                    >
+                        GAME
+                    </div>
+
+                    <h2
+                        id="gameModalTitle"
+                    >
+                        Игра
+                    </h2>
+
+                </div>
+
+                <button
+                    class="modal-close"
+                    type="button"
+                    data-close-modal="gameModal"
+                >
+                    ×
+                </button>
+
+            </header>
+
+
+            <div
+                id="gameContainer"
+                class="game-container"
+            >
+
+                <div class="game-loading">
+                    Загрузка игры...
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+
+
+    <!-- =====================================================
+         CONFIRMATION MODAL
+    ====================================================== -->
+
+    <div
+        id="confirmModal"
+        class="modal hidden"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="confirmModalTitle"
+    >
+
+        <div class="modal-backdrop"></div>
+
+
+        <div class="modal-card confirm-modal-card">
+
+            <div
+                id="confirmModalIcon"
+                class="confirm-icon"
+            >
+                ?
+            </div>
+
+
+            <h2 id="confirmModalTitle">
+                Подтвердить действие
+            </h2>
+
+
+            <p id="confirmModalText">
+                Ты уверен?
+            </p>
+
+
+            <div class="modal-footer">
+
+                <button
+                    id="confirmCancelButton"
+                    class="secondary-button"
+                    type="button"
+                >
+                    Отмена
+                </button>
+
+                <button
+                    id="confirmActionButton"
+                    class="danger-button"
+                    type="button"
+                >
+                    Подтвердить
+                </button>
+
+            </div>
+
+        </div>
+
+    </div>
+
+
+
+    <!-- =====================================================
+         USER ACTIONS MODAL
+    ====================================================== -->
+
+    <div
+        id="userActionsModal"
+        class="modal hidden"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Действия пользователя"
+    >
+
+        <div class="modal-backdrop"></div>
+
+
+        <div class="action-sheet">
+
+            <button
+                class="action-sheet-button"
+                type="button"
+                data-user-action="message"
+            >
+                <span>
+                    ◇
+                </span>
+                Написать сообщение
+            </button>
+
+
+            <button
+                class="action-sheet-button"
+                type="button"
+                data-user-action="follow"
+            >
+                <span>
+                    ♡
+                </span>
+                Подписаться
+            </button>
+
+
+            <button
+                class="action-sheet-button"
+                type="button"
+                data-user-action="mute"
+            >
+                <span>
+                    ◌
+                </span>
+                Скрыть
+            </button>
+
+
+            <button
+                class="action-sheet-button"
+                type="button"
+                data-user-action="block"
+            >
+                <span>
+                    ⊘
+                </span>
+                Заблокировать
+            </button>
+
+
+            <button
+                class="action-sheet-button danger"
+                type="button"
+                data-user-action="report"
+            >
+                <span>
+                    ⚑
+                </span>
+                Пожаловаться
+            </button>
+
+
+            <button
+                class="action-sheet-button cancel"
+                type="button"
+                data-close-modal="userActionsModal"
+            >
+                Отмена
+            </button>
+
+        </div>
+
+    </div>
+
+
+
+    <!-- =====================================================
+         REPORT MODAL
+    ====================================================== -->
+
+    <div
+        id="reportModal"
+        class="modal hidden"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="reportModalTitle"
+    >
+
+        <div class="modal-backdrop"></div>
+
+
+        <div class="modal-card">
+
+            <header class="modal-header">
+
+                <div>
+
+                    <div class="modal-eyebrow">
+                        MODERATION
+                    </div>
+
+                    <h2 id="reportModalTitle">
+                        Пожаловаться
+                    </h2>
+
+                </div>
+
+                <button
+                    class="modal-close"
+                    type="button"
+                    data-close-modal="reportModal"
+                >
+                    ×
+                </button>
+
+            </header>
+
+
+            <form id="reportForm">
+
+                <div class="report-options">
+
+                    <label class="report-option">
+
+                        <input
+                            type="radio"
+                            name="reportReason"
+                            value="harassment"
+                        >
+
+                        <span>
+                            Травля или преследование
+                        </span>
+
+                    </label>
+
+
+                    <label class="report-option">
+
+                        <input
+                            type="radio"
+                            name="reportReason"
+                            value="personal-data"
+                        >
+
+                        <span>
+                            Раскрытие личных данных
+                        </span>
+
+                    </label>
+
+
+                    <label class="report-option">
+
+                        <input
+                            type="radio"
+                            name="reportReason"
+                            value="impersonation"
+                        >
+
+                        <span>
+                            Выдача себя за другого
+                        </span>
+
+                    </label>
+
+
+                    <label class="report-option">
+
+                        <input
+                            type="radio"
+                            name="reportReason"
+                            value="spam"
+                        >
+
+                        <span>
+                            Спам
+                        </span>
+
+                    </label>
+
+
+                    <label class="report-option">
+
+                        <input
+                            type="radio"
+                            name="reportReason"
+                            value="other"
+                        >
+
+                        <span>
+                            Другое
+                        </span>
+
+                    </label>
+
+                </div>
+
+
+                <div class="form-field">
+
+                    <label
+                        class="form-label"
+                        for="reportDescription"
+                    >
+                        Дополнительно
+                    </label>
+
+                    <textarea
+                        id="reportDescription"
+                        class="form-input textarea-input"
+                        maxlength="1000"
+                        rows="5"
+                        placeholder="Что произошло?"
+                    ></textarea>
+
+                </div>
+
+
+                <div class="modal-footer">
+
+                    <button
+                        class="secondary-button"
+                        type="button"
+                        data-close-modal="reportModal"
+                    >
+                        Отмена
+                    </button>
+
+                    <button
+                        class="danger-button"
+                        type="submit"
+                    >
+                        Отправить жалобу
+                    </button>
+
+                </div>
+
+            </form>
+
+        </div>
+
+    </div>
+
+
+
+    <!-- =====================================================
+         GLOBAL SEARCH OVERLAY
+    ====================================================== -->
+
+    <div
+        id="searchOverlay"
+        class="search-overlay hidden"
+        aria-hidden="true"
+    >
+
+        <div class="search-overlay-inner">
+
+            <header class="search-overlay-header">
+
+                <button
+                    id="closeSearchOverlayButton"
+                    class="icon-action-button"
+                    type="button"
+                    aria-label="Закрыть поиск"
+                >
+                    ×
+                </button>
+
+                <h2>
+                    Поиск
+                </h2>
+
+            </header>
+
+
+            <div class="overlay-search-box">
+
+                <span>
+                    ⌕
+                </span>
+
+                <input
+                    id="overlaySearchInput"
+                    type="search"
+                    placeholder="Найти пользователя..."
+                    autocomplete="off"
+                >
+
+            </div>
+
+
+            <div
+                id="overlaySearchResults"
+                class="overlay-search-results"
+            ></div>
+
+        </div>
+
+    </div>
+
+
+
+    <!-- =====================================================
+         TOAST SYSTEM
+    ====================================================== -->
+
+    <div
+        id="toastContainer"
+        class="toast-container"
+        aria-live="polite"
+        aria-atomic="true"
+    ></div>
+
+
+
+    <!-- =====================================================
+         GLOBAL LOADING
+    ====================================================== -->
+
+    <div
+        id="globalLoader"
+        class="global-loader hidden"
+        aria-hidden="true"
+    >
+
+        <div class="global-loader-card">
+
+            <div class="loading-spinner"></div>
+
+            <span id="globalLoaderText">
+                Загрузка...
+            </span>
+
+        </div>
+
+    </div>
+
+
+
+    <!-- =====================================================
+         FILE INPUTS
+         Будут подключены к media-системе в JS.
+    ====================================================== -->
+
+    <input
+        id="imageFileInput"
+        class="hidden"
+        type="file"
+        accept="image/*"
+        multiple
+    >
+
+
+    <input
+        id="videoFileInput"
+        class="hidden"
+        type="file"
+        accept="video/*"
+    >
+
+
+    <input
+        id="avatarFileInput"
+        class="hidden"
+        type="file"
+        accept="image/*"
+    >
+
+
+
+    <!-- =====================================================
+         CONTEXT MENU
+    ====================================================== -->
+
+    <div
+        id="contextMenu"
+        class="context-menu hidden"
+        role="menu"
+    >
+
+        <button
+            type="button"
+            role="menuitem"
+            data-context-action="save"
+        >
+            ♡
+            Сохранить
+        </button>
+
+
+        <button
+            type="button"
+            role="menuitem"
+            data-context-action="share"
+        >
+            ↗
+            Поделиться
+        </button>
+
+
+        <button
+            type="button"
+            role="menuitem"
+            data-context-action="copy"
+        >
+            ▫
+            Копировать ссылку
+        </button>
+
+
+        <button
+            type="button"
+            role="menuitem"
+            data-context-action="report"
+        >
+            ⚑
+            Пожаловаться
+        </button>
+
+    </div>
+
+
+
+    <!-- =====================================================
+         SCREEN READER ANNOUNCER
+    ====================================================== -->
+
+    <div
+        id="screenReaderAnnouncer"
+        class="sr-only"
+        aria-live="assertive"
+        aria-atomic="true"
+    ></div>
+
+</div>
+
+
+
+<!-- =========================================================
+     JAVASCRIPT
+     Пока подключаем пустой/будущий файл.
+     Вся логика будет вынесена туда.
+========================================================= -->
+
+<script src="script.js" defer></script>
+
+</body>
+</html>
