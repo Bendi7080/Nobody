@@ -1,3975 +1,2772 @@
-/* =========================================================
-   NOBODY v0.1
-   APPLICATION CORE
-   JavaScript
-========================================================= */
+"use strict";
 
-/* =========================================================
-   CONFIG
-========================================================= */
+const API = "/api";
 
-const NOBODY = {
-    version: "0.1",
-    name: "NOBODY",
-    maxUsernameLength: 24,
-    maxPostLength: 1000,
-    maxCommentLength: 300,
-    maxMessageLength: 2000,
-    maxRoomItems: 100,
-    defaultTheme: "system",
-    ownerRole: "OWNER"
+const state = {
+  token: localStorage.getItem("nobody_token") || "",
+  user: null,
+  currentPage: "home",
+  currentChat: null,
+  posts: [],
+  conversations: [],
+  theme: localStorage.getItem("nobody_theme") || "system",
+  authMode: "login"
 };
 
-/* =========================================================
-   STORAGE
-========================================================= */
+const $ = (selector) => document.querySelector(selector);
+const $$ = (selector) => [...document.querySelectorAll(selector)];
 
-const STORAGE = {
-    USERS: "nobody_v01_users",
-    POSTS: "nobody_v01_posts",
-    SESSION: "nobody_v01_session",
-    THEME: "nobody_v01_theme",
-    MESSAGES: "nobody_v01_messages",
-    ROOMS: "nobody_v01_rooms",
-    GAMES: "nobody_v01_games",
-    NOTIFICATIONS: "nobody_v01_notifications",
-    REPORTS: "nobody_v01_reports",
-    BLOCKS: "nobody_v01_blocks",
-    SETTINGS: "nobody_v01_settings",
-    MEDIA: "nobody_v01_media",
-    ACTIVITY: "nobody_v01_activity"
-};
+function setToken(token) {
+  state.token = token || "";
 
-/* =========================================================
-   GENERIC STORAGE
-========================================================= */
+  if (token) {
+    localStorage.setItem("nobody_token", token);
+  } else {
+    localStorage.removeItem("nobody_token");
+  }
+}
 
-function readStorage(key, fallback = []) {
-    try {
-        const value = localStorage.getItem(key);
-        if (!value) return fallback;
-        return JSON.parse(value);
-    } catch (error) {
-        console.error("NOBODY storage error:", error);
-        return fallback;
+async function api(endpoint, options = {}) {
+  const config = {
+    ...options,
+    headers: {
+      ...(options.body ? { "Content-Type": "application/json" } : {}),
+      ...(state.token
+        ? { Authorization: `Bearer ${state.token}` }
+        : {}),
+      ...(options.headers || {})
     }
-}
+  };
 
-function writeStorage(key, value) {
-    try {
-        localStorage.setItem(key, JSON.stringify(value));
-        return true;
-    } catch (error) {
-        console.error("NOBODY storage write error:", error);
-        showToast("Не удалось сохранить данные");
-        return false;
-    }
-}
+  const response = await fetch(`${API}${endpoint}`, config);
 
-function removeStorage(key) {
-    localStorage.removeItem(key);
-}
+  let data = {};
 
-function storageExists(key) {
-    return localStorage.getItem(key) !== null;
-}
+  try {
+    data = await response.json();
+  } catch {
+    data = {};
+  }
 
-/* =========================================================
-   IDs
-========================================================= */
-
-function uuid() {
-    if (
-        typeof crypto !== "undefined" &&
-        typeof crypto.randomUUID === "function"
-    ) {
-        return crypto.randomUUID();
+  if (!response.ok) {
+    if (response.status === 401) {
+      setToken("");
+      state.user = null;
     }
 
-    return (
-        Date.now().toString(36) +
-        Math.random().toString(36).slice(2)
+    throw new Error(
+      data.message || "Произошла ошибка."
     );
+  }
+
+  return data;
 }
 
-function generateAnonymousID() {
-    return (
-        "user_" +
-        uuid()
-            .replaceAll("-", "")
-            .slice(0, 12)
-            .toUpperCase()
-    );
+function showToast(message, type = "normal") {
+  const toast = $("#toast");
+
+  if (!toast) return;
+
+  toast.textContent = message;
+  toast.dataset.type = type;
+  toast.classList.add("show");
+
+  clearTimeout(showToast.timer);
+
+  showToast.timer = setTimeout(() => {
+    toast.classList.remove("show");
+  }, 2800);
 }
 
-function generatePostID() {
-    return "post_" + uuid();
+function setMessage(element, message, type = "error") {
+  if (!element) return;
+
+  element.textContent = message;
+  element.dataset.type = type;
 }
 
-function generateCommentID() {
-    return "comment_" + uuid();
-}
+function formatDate(dateString) {
+  const date = new Date(dateString);
 
-function generateMessageID() {
-    return "message_" + uuid();
-}
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
 
-function generateRoomID() {
-    return "room_" + uuid();
-}
+  const now = new Date();
+  const diff = now - date;
 
-function generateNotificationID() {
-    return "notification_" + uuid();
-}
+  if (diff < 60 * 1000) {
+    return "только что";
+  }
 
-function generateReportID() {
-    return "report_" + uuid();
-}
+  if (diff < 60 * 60 * 1000) {
+    return `${Math.floor(diff / 60000)} мин`;
+  }
 
-/* =========================================================
-   SECURITY HELPERS
-========================================================= */
+  if (diff < 24 * 60 * 60 * 1000) {
+    return `${Math.floor(diff / 3600000)} ч`;
+  }
+
+  return date.toLocaleDateString("ru-RU", {
+    day: "numeric",
+    month: "short"
+  });
+}
 
 function escapeHTML(value) {
-    return String(value ?? "")
-        .replaceAll("&", "&amp;")
-        .replaceAll("<", "&lt;")
-        .replaceAll(">", "&gt;")
-        .replaceAll('"', "&quot;")
-        .replaceAll("'", "&#039;");
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
 }
 
-function normalizeUsername(username) {
-    return String(username || "")
-        .trim()
-        .replace(/^@+/, "")
-        .toLowerCase();
+function initials(user) {
+  const name =
+    user?.displayName ||
+    user?.username ||
+    "N";
+
+  return escapeHTML(
+    name.slice(0, 1).toUpperCase()
+  );
 }
 
-function displayUsername(username) {
-    if (!username) return "Nobody";
-    return username.startsWith("@")
-        ? username
-        : `@${username}`;
-}
-
-function getInitial(value) {
-    const username = String(value || "")
-        .replace(/^@/, "")
-        .trim();
-
-    return username
-        ? username.charAt(0).toUpperCase()
-        : "?";
-}
-
-function sanitizeText(text, maxLength) {
-    return String(text || "")
-        .replace(/\u0000/g, "")
-        .trim()
-        .slice(0, maxLength);
-}
-
-function formatDate(timestamp) {
-    const date = new Date(timestamp);
-
-    if (Number.isNaN(date.getTime())) {
-        return "неизвестно";
-    }
-
-    return date.toLocaleString("ru-RU", {
-        day: "2-digit",
-        month: "2-digit",
-        hour: "2-digit",
-        minute: "2-digit"
-    });
-}
-
-function formatFullDate(timestamp) {
-    const date = new Date(timestamp);
-
-    return date.toLocaleString("ru-RU", {
-        day: "2-digit",
-        month: "2-digit",
-        year: "numeric",
-        hour: "2-digit",
-        minute: "2-digit"
-    });
-}
-
-function randomNumber(min, max) {
-    return Math.floor(
-        Math.random() * (max - min + 1)
-    ) + min;
-}
-
-/* =========================================================
-   USERS
-========================================================= */
-
-function getUsers() {
-    return readStorage(STORAGE.USERS, []);
-}
-
-function saveUsers(users) {
-    return writeStorage(STORAGE.USERS, users);
-}
-
-function getUserByID(userID) {
-    return getUsers().find(
-        user => user.id === userID
-    ) || null;
-}
-
-function getUserByUsername(username) {
-    const normalized = normalizeUsername(username);
-
-    return getUsers().find(
-        user =>
-            normalizeUsername(user.username) === normalized
-    ) || null;
-}
-
-function getCurrentSessionID() {
-    return localStorage.getItem(
-        STORAGE.SESSION
-    );
-}
-
-function getCurrentUser() {
-    const sessionID = getCurrentSessionID();
-
-    if (!sessionID) {
-        return null;
-    }
-
-    return getUserByID(sessionID);
-}
-
-function saveCurrentSession(user) {
-    if (!user) return;
-
-    localStorage.setItem(
-        STORAGE.SESSION,
-        user.id
-    );
-}
-
-function clearCurrentSession() {
-    removeStorage(STORAGE.SESSION);
-}
-
-function usernameTaken(username) {
-    const normalized = normalizeUsername(username);
-
-    return getUsers().some(
-        user =>
-            normalizeUsername(user.username) === normalized
-    );
-}
-
-/* =========================================================
-   USERNAME VALIDATION
-========================================================= */
-
-function validateUsername(username) {
-    const clean = normalizeUsername(username);
-
-    if (!clean) {
-        return {
-            valid: false,
-            message: "Введите ник."
-        };
-    }
-
-    if (
-        clean.length < 2 ||
-        clean.length > NOBODY.maxUsernameLength
-    ) {
-        return {
-            valid: false,
-            message:
-                `Ник должен содержать от 2 до ${NOBODY.maxUsernameLength} символов.`
-        };
-    }
-
-    if (!/^[a-zA-Z0-9_.-]+$/.test(clean)) {
-        return {
-            valid: false,
-            message:
-                "Разрешены латинские буквы, цифры, _, . и -."
-        };
-    }
-
-    const reserved = [
-        "admin",
-        "administrator",
-        "owner",
-        "nobody",
-        "support",
-        "moderator",
-        "moderation",
-        "system",
-        "official"
-    ];
-
-    if (reserved.includes(clean)) {
-        return {
-            valid: false,
-            message: "Этот ник зарезервирован."
-        };
-    }
-
-    return {
-        valid: true,
-        username: clean
-    };
-}
-
-/* =========================================================
-   USER FACTORY
-========================================================= */
-
-function createUserObject(username, password) {
-    const now = Date.now();
-
-    return {
-        id: generateAnonymousID(),
-        username: displayUsername(username),
-        password: password,
-        bio: "",
-        avatar: null,
-        followers: [],
-        following: [],
-        blocked: [],
-        postsCount: 0,
-        likesReceived: 0,
-        dislikesReceived: 0,
-        createdAt: now,
-        lastSeen: now,
-        role: "USER",
-        verified: false,
-        online: true,
-        room: {
-            name: "Моя комната",
-            description: "Добро пожаловать.",
-            wallpaper: "default",
-            items: [],
-            visitors: []
-        },
-        settings: {
-            profileVisible: true,
-            allowMessages: true,
-            allowComments: true,
-            notifications: true
-        }
-    };
-}
-
-/* =========================================================
-   REGISTER
-========================================================= */
-
-function registerUser(username, password) {
-    const users = getUsers();
-
-    const validation =
-        validateUsername(username);
-
-    if (!validation.valid) {
-        return {
-            success: false,
-            message: validation.message
-        };
-    }
-
-    if (usernameTaken(validation.username)) {
-        return {
-            success: false,
-            message: "Этот ник уже занят."
-        };
-    }
-
-    if (
-        typeof password !== "string" ||
-        password.length < 6
-    ) {
-        return {
-            success: false,
-            message:
-                "Пароль должен содержать минимум 6 символов."
-        };
-    }
-
-    const user =
-        createUserObject(
-            validation.username,
-            password
-        );
-
-    users.push(user);
-
-    saveUsers(users);
-    saveCurrentSession(user);
-
-    addActivity(
-        user.id,
-        "ACCOUNT_CREATED"
-    );
-
-    return {
-        success: true,
-        user
-    };
-}
-
-/* =========================================================
-   LOGIN
-========================================================= */
-
-function loginUser(username, password) {
-    const users = getUsers();
-
-    const normalized =
-        normalizeUsername(username);
-
-    const user =
-        users.find(
-            item =>
-                normalizeUsername(item.username) ===
-                    normalized &&
-                item.password === password
-        );
-
-    if (!user) {
-        return {
-            success: false,
-            message:
-                "Неверный ник или пароль."
-        };
-    }
-
-    user.online = true;
-    user.lastSeen = Date.now();
-
-    saveUsers(users);
-    saveCurrentSession(user);
-
-    addActivity(
-        user.id,
-        "LOGIN"
-    );
-
-    return {
-        success: true,
-        user
-    };
-}
-
-/* =========================================================
-   LOGOUT
-========================================================= */
-
-function logoutUser() {
-    const user = getCurrentUser();
-
-    if (user) {
-        const users = getUsers();
-
-        const storedUser =
-            users.find(
-                item => item.id === user.id
-            );
-
-        if (storedUser) {
-            storedUser.online = false;
-            storedUser.lastSeen = Date.now();
-            saveUsers(users);
-        }
-
-        addActivity(
-            user.id,
-            "LOGOUT"
-        );
-    }
-
-    clearCurrentSession();
-    renderApplication();
-}
-
-/* =========================================================
-   AUTH UI
-========================================================= */
-
-let authMode = "login";
-
-const authTabs =
-    document.querySelectorAll(
-        "[data-auth-mode]"
-    );
-
-authTabs.forEach(tab => {
-    tab.addEventListener(
-        "click",
-        () => {
-            authTabs.forEach(item =>
-                item.classList.remove("active")
-            );
-
-            tab.classList.add("active");
-
-            authMode =
-                tab.dataset.authMode;
-
-            const submit =
-                document.getElementById(
-                    "authSubmit"
-                );
-
-            if (submit) {
-                submit.textContent =
-                    authMode === "login"
-                        ? "Войти"
-                        : "Создать аккаунт";
-            }
-
-            const message =
-                document.getElementById(
-                    "authMessage"
-                );
-
-            if (message) {
-                message.textContent = "";
-            }
-        }
-    );
-});
-
-/* =========================================================
-   AUTH FORM
-========================================================= */
-
-const authForm =
-    document.getElementById("authForm");
-
-if (authForm) {
-    authForm.addEventListener(
-        "submit",
-        event => {
-            event.preventDefault();
-
-            const usernameInput =
-                document.getElementById(
-                    "usernameInput"
-                );
-
-            const passwordInput =
-                document.getElementById(
-                    "passwordInput"
-                );
-
-            const message =
-                document.getElementById(
-                    "authMessage"
-                );
-
-            const username =
-                usernameInput.value
-                    .trim()
-                    .replace(/^@/, "");
-
-            const password =
-                passwordInput.value;
-
-            const result =
-                authMode === "register"
-                    ? registerUser(
-                        username,
-                        password
-                    )
-                    : loginUser(
-                        username,
-                        password
-                    );
-
-            if (!result.success) {
-                message.textContent =
-                    result.message;
-                return;
-            }
-
-            message.textContent = "";
-
-            authForm.reset();
-
-            renderApplication();
-
-            showToast(
-                authMode === "register"
-                    ? "Аккаунт создан ✨"
-                    : "С возвращением 👋"
-            );
-        }
-    );
-}
-
-/* =========================================================
-   POSTS
-========================================================= */
-
-function getPosts() {
-    return readStorage(
-        STORAGE.POSTS,
-        []
-    );
-}
-
-function savePosts(posts) {
-    return writeStorage(
-        STORAGE.POSTS,
-        posts
-    );
-}
-
-function getPostByID(postID) {
-    return getPosts().find(
-        post => post.id === postID
-    ) || null;
-}
-
-function createPost(text) {
-    const user = getCurrentUser();
-
-    if (!user) {
-        return {
-            success: false,
-            message: "Нужно войти."
-        };
-    }
-
-    const cleanText =
-        sanitizeText(
-            text,
-            NOBODY.maxPostLength
-        );
-
-    if (!cleanText) {
-        return {
-            success: false,
-            message: "Пост пустой."
-        };
-    }
-
-    const posts = getPosts();
-
-    const post = {
-        id: generatePostID(),
-        userId: user.id,
-        username: user.username,
-        text: cleanText,
-        likes: [],
-        dislikes: [],
-        comments: [],
-        media: [],
-        repostOf: null,
-        createdAt: Date.now(),
-        editedAt: null,
-        pinned: false
-    };
-
-    posts.unshift(post);
-
-    savePosts(posts);
-
-    updateUserPostCount(
-        user.id,
-        1
-    );
-
-    addActivity(
-        user.id,
-        "POST_CREATED",
-        {
-            postID: post.id
-        }
-    );
-
-    return {
-        success: true,
-        post
-    };
-}
-
-/* =========================================================
-   UPDATE USER POST COUNT
-========================================================= */
-
-function updateUserPostCount(
-    userID,
-    amount
-) {
-    const users = getUsers();
-
-    const user =
-        users.find(
-            item => item.id === userID
-        );
-
-    if (!user) return;
-
-    user.postsCount =
-        Math.max(
-            0,
-            Number(user.postsCount || 0) +
-                amount
-        );
-
-    saveUsers(users);
-}
-
-/* =========================================================
-   DELETE POST
-========================================================= */
-
-function deletePost(postID) {
-    const user = getCurrentUser();
-
-    if (!user) return false;
-
-    const posts = getPosts();
-
-    const index =
-        posts.findIndex(
-            post => post.id === postID
-        );
-
-    if (index === -1) {
-        return false;
-    }
-
-    const post = posts[index];
-
-    if (
-        post.userId !== user.id &&
-        user.role !== NOBODY.ownerRole
-    ) {
-        return false;
-    }
-
-    posts.splice(index, 1);
-
-    savePosts(posts);
-
-    updateUserPostCount(
-        post.userId,
-        -1
-    );
-
-    addActivity(
-        user.id,
-        "POST_DELETED",
-        {
-            postID
-        }
-    );
-
-    renderFeed();
-
-    showToast(
-        "Пост удалён"
-    );
-
-    return true;
-}
-
-/* =========================================================
-   EDIT POST
-========================================================= */
-
-function editPost(
-    postID,
-    text
-) {
-    const user = getCurrentUser();
-
-    if (!user) return false;
-
-    const posts = getPosts();
-
-    const post =
-        posts.find(
-            item => item.id === postID
-        );
-
-    if (!post) return false;
-
-    if (
-        post.userId !== user.id &&
-        user.role !== NOBODY.ownerRole
-    ) {
-        return false;
-    }
-
-    const cleanText =
-        sanitizeText(
-            text,
-            NOBODY.maxPostLength
-        );
-
-    if (!cleanText) {
-        return false;
-    }
-
-    post.text = cleanText;
-    post.editedAt = Date.now();
-
-    savePosts(posts);
-
-    renderFeed();
-
-    showToast(
-        "Пост изменён"
-    );
-
-    return true;
-}
-
-/* =========================================================
-   REACTIONS
-========================================================= */
-
-function toggleReaction(
-    postID,
-    type
-) {
-    const user = getCurrentUser();
-
-    if (!user) return;
-
-    if (
-        type !== "like" &&
-        type !== "dislike"
-    ) {
-        return;
-    }
-
-    const posts = getPosts();
-
-    const post =
-        posts.find(
-            item => item.id === postID
-        );
-
-    if (!post) return;
-
-    if (!Array.isArray(post.likes)) {
-        post.likes = [];
-    }
-
-    if (!Array.isArray(post.dislikes)) {
-        post.dislikes = [];
-    }
-
-    const target =
-        type === "like"
-            ? post.likes
-            : post.dislikes;
-
-    const opposite =
-        type === "like"
-            ? post.dislikes
-            : post.likes;
-
-    const targetIndex =
-        target.indexOf(user.id);
-
-    const oppositeIndex =
-        opposite.indexOf(user.id);
-
-    if (oppositeIndex !== -1) {
-        opposite.splice(
-            oppositeIndex,
-            1
-        );
-    }
-
-    if (targetIndex === -1) {
-        target.push(user.id);
-    } else {
-        target.splice(
-            targetIndex,
-            1
-        );
-    }
-
-    savePosts(posts);
-
-    updateReceivedReactions(
-        post.userId
-    );
-
-    renderFeed();
-}
-
-/* =========================================================
-   REACTION STATISTICS
-========================================================= */
-
-function updateReceivedReactions(userID) {
-    const users = getUsers();
-
-    const user =
-        users.find(
-            item => item.id === userID
-        );
-
-    if (!user) return;
-
-    const posts =
-        getPosts().filter(
-            post => post.userId === userID
-        );
-
-    user.likesReceived =
-        posts.reduce(
-            (total, post) =>
-                total +
-                (
-                    Array.isArray(post.likes)
-                        ? post.likes.length
-                        : 0
-                ),
-            0
-        );
-
-    user.dislikesReceived =
-        posts.reduce(
-            (total, post) =>
-                total +
-                (
-                    Array.isArray(post.dislikes)
-                        ? post.dislikes.length
-                        : 0
-                ),
-            0
-        );
-
-    saveUsers(users);
-}
-
-/* =========================================================
-   COMMENTS
-========================================================= */
-
-function addComment(
-    postID,
-    text
-) {
-    const user = getCurrentUser();
-
-    if (!user) return false;
-
-    const cleanText =
-        sanitizeText(
-            text,
-            NOBODY.maxCommentLength
-        );
-
-    if (!cleanText) return false;
-
-    const posts = getPosts();
-
-    const post =
-        posts.find(
-            item => item.id === postID
-        );
-
-    if (!post) return false;
-
-    if (!Array.isArray(post.comments)) {
-        post.comments = [];
-    }
-
-    const comment = {
-        id: generateCommentID(),
-        userId: user.id,
-        username: user.username,
-        text: cleanText,
-        createdAt: Date.now(),
-        likes: []
-    };
-
-    post.comments.push(comment);
-
-    savePosts(posts);
-
-    if (post.userId !== user.id) {
-        createNotification(
-            post.userId,
-            "COMMENT",
-            {
-                postID,
-                commentID: comment.id,
-                username: user.username
-            }
-        );
-    }
-
-    renderFeed();
-
-    return true;
-}
-
-/* =========================================================
-   DELETE COMMENT
-========================================================= */
-
-function deleteComment(
-    postID,
-    commentID
-) {
-    const user = getCurrentUser();
-
-    if (!user) return false;
-
-    const posts = getPosts();
-
-    const post =
-        posts.find(
-            item => item.id === postID
-        );
-
-    if (!post) return false;
-
-    const comments =
-        Array.isArray(post.comments)
-            ? post.comments
-            : [];
-
-    const index =
-        comments.findIndex(
-            comment =>
-                comment.id === commentID
-        );
-
-    if (index === -1) {
-        return false;
-    }
-
-    const comment =
-        comments[index];
-
-    if (
-        comment.userId !== user.id &&
-        post.userId !== user.id &&
-        user.role !== NOBODY.ownerRole
-    ) {
-        return false;
-    }
-
-    comments.splice(index, 1);
-
-    post.comments = comments;
-
-    savePosts(posts);
-
-    renderFeed();
-
-    return true;
-}
-
-/* =========================================================
-   COMMENT UI
-========================================================= */
-
-function toggleComments(postID) {
-    const element =
-        document.getElementById(
-            `comments-${postID}`
-        );
-
-    if (!element) return;
-
-    element.classList.toggle(
-        "hidden"
-    );
-}
-
-function submitComment(
-    event,
-    postID
-) {
-    event.preventDefault();
-
-    const form =
-        event.currentTarget;
-
-    const input =
-        form.querySelector("input");
-
-    if (!input) return;
-
-    addComment(
-        postID,
-        input.value
-    );
-
-    input.value = "";
-}
-
-/* =========================================================
-   FEED RENDER
-========================================================= */
-
-function renderFeed() {
-    const feed =
-        document.getElementById("feed");
-
-    if (!feed) return;
-
-    const posts = getPosts();
-
-    const currentUser =
-        getCurrentUser();
-
-    if (!currentUser) {
-        feed.innerHTML = "";
-        return;
-    }
-
-    if (!posts.length) {
-        feed.innerHTML = `
-            <article class="post">
-                <div class="center">
-                    <div style="font-size:35px;margin-bottom:10px">
-                        🌙
-                    </div>
-                    <strong>
-                        Здесь пока тихо.
-                    </strong>
-                    <p class="muted" style="margin-top:6px">
-                        Создай первый пост NOBODY.
-                    </p>
-                </div>
-            </article>
-        `;
-
-        return;
-    }
-
-    feed.innerHTML =
-        posts
-            .map(post => {
-                const likes =
-                    Array.isArray(post.likes)
-                        ? post.likes
-                        : [];
-
-                const dislikes =
-                    Array.isArray(post.dislikes)
-                        ? post.dislikes
-                        : [];
-
-                const comments =
-                    Array.isArray(post.comments)
-                        ? post.comments
-                        : [];
-
-                const liked =
-                    likes.includes(
-                        currentUser.id
-                    );
-
-                const disliked =
-                    dislikes.includes(
-                        currentUser.id
-                    );
-
-                const own =
-                    post.userId ===
-                    currentUser.id;
-
-                return `
-                    <article
-                        class="post"
-                        data-post-id="${escapeHTML(post.id)}"
-                    >
-                        <div class="post-header">
-                            <button
-                                class="avatar"
-                                onclick="openUserProfile('${escapeHTML(post.userId)}')"
-                            >
-                                ${escapeHTML(
-                                    getInitial(post.username)
-                                )}
-                            </button>
-
-                            <div>
-                                <button
-                                    class="post-author"
-                                    style="border:0;background:none;color:inherit"
-                                    onclick="openUserProfile('${escapeHTML(post.userId)}')"
-                                >
-                                    ${escapeHTML(
-                                        post.username || "Nobody"
-                                    )}
-                                </button>
-
-                                <div class="post-id">
-                                    ${escapeHTML(post.userId)}
-                                </div>
-                            </div>
-
-                            <div class="post-time">
-                                ${escapeHTML(
-                                    formatDate(post.createdAt)
-                                )}
-                            </div>
-                        </div>
-
-                        <div class="post-content">
-                            ${escapeHTML(post.text)
-                                .replaceAll("\n", "<br>")}
-                        </div>
-
-                        <div class="post-actions">
-                            <button
-                                class="reaction"
-                                onclick="toggleReaction('${escapeHTML(post.id)}','like')"
-                                style="${liked ? "outline:2px solid var(--accent)" : ""}"
-                            >
-                                ❤️ ${likes.length}
-                            </button>
-
-                            <button
-                                class="reaction"
-                                onclick="toggleReaction('${escapeHTML(post.id)}','dislike')"
-                                style="${disliked ? "outline:2px solid var(--danger)" : ""}"
-                            >
-                                👎 ${dislikes.length}
-                            </button>
-
-                            <button
-                                class="reaction"
-                                onclick="toggleComments('${escapeHTML(post.id)}')"
-                            >
-                                💬 ${comments.length}
-                            </button>
-
-                            ${
-                                own ||
-                                currentUser.role ===
-                                    NOBODY.ownerRole
-                                    ? `
-                                        <button
-                                            class="reaction"
-                                            onclick="deletePost('${escapeHTML(post.id)}')"
-                                        >
-                                            🗑️
-                                        </button>
-                                    `
-                                    : `
-                                        <button
-                                            class="reaction"
-                                            onclick="reportPost('${escapeHTML(post.id)}')"
-                                        >
-                                            ⚑
-                                        </button>
-                                    `
-                            }
-                        </div>
-
-                        <div
-                            class="comments hidden"
-                            id="comments-${escapeHTML(post.id)}"
-                        >
-                            ${
-                                comments.length
-                                    ? comments
-                                        .map(
-                                            comment => `
-                                                <div class="comment">
-                                                    <div class="comment-avatar">
-                                                        ${escapeHTML(
-                                                            getInitial(
-                                                                comment.username
-                                                            )
-                                                        )}
-                                                    </div>
-
-                                                    <div class="comment-box">
-                                                        <div class="comment-name">
-                                                            ${escapeHTML(
-                                                                comment.username
-                                                            )}
-                                                        </div>
-
-                                                        <div class="comment-text">
-                                                            ${escapeHTML(
-                                                                comment.text
-                                                            )}
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            `
-                                        )
-                                        .join("")
-                                    : `
-                                        <p class="muted">
-                                            Пока нет комментариев.
-                                        </p>
-                                    `
-                            }
-
-                            <form
-                                class="comment-form"
-                                onsubmit="submitComment(event,'${escapeHTML(post.id)}')"
-                            >
-                                <input
-                                    class="input"
-                                    maxlength="${NOBODY.maxCommentLength}"
-                                    placeholder="Написать комментарий..."
-                                    required
-                                >
-
-                                <button
-                                    class="button button-primary"
-                                    type="submit"
-                                >
-                                    →
-                                </button>
-                            </form>
-                        </div>
-                    </article>
-                `;
-            })
-            .join("");
-}
-
-/* =========================================================
-   SEARCH
-========================================================= */
-
-const searchInput =
-    document.getElementById(
-        "searchInput"
-    );
-
-if (searchInput) {
-    searchInput.addEventListener(
-        "input",
-        event => {
-            searchUsers(
-                event.target.value
-            );
-        }
-    );
-}
-
-function searchUsers(query) {
-    const results =
-        document.getElementById(
-            "searchResults"
-        );
-
-    if (!results) return;
-
-    const clean =
-        normalizeUsername(query);
-
-    if (!clean) {
-        results.innerHTML = `
-            <div class="post center muted">
-                Начни вводить ник или Anonymous ID.
-            </div>
-        `;
-        return;
-    }
-
-    const currentUser =
-        getCurrentUser();
-
-    const users =
-        getUsers()
-            .filter(user => {
-                if (
-                    currentUser &&
-                    isBlockedBetween(
-                        currentUser.id,
-                        user.id
-                    )
-                ) {
-                    return false;
-                }
-
-                return (
-                    normalizeUsername(
-                        user.username
-                    ).includes(clean) ||
-                    user.id
-                        .toLowerCase()
-                        .includes(
-                            clean.toLowerCase()
-                        )
-                );
-            })
-            .slice(0, 30);
-
-    if (!users.length) {
-        results.innerHTML = `
-            <div class="post center muted">
-                Никого не найдено.
-            </div>
-        `;
-        return;
-    }
-
-    results.innerHTML =
-        users
-            .map(
-                user => `
-                    <button
-                        class="search-user"
-                        onclick="openUserProfile('${escapeHTML(user.id)}')"
-                    >
-                        <div class="avatar">
-                            ${escapeHTML(
-                                getInitial(
-                                    user.username
-                                )
-                            )}
-                        </div>
-
-                        <div class="search-user-info">
-                            <div class="search-user-name">
-                                ${escapeHTML(
-                                    user.username ||
-                                    "Nobody"
-                                )}
-                            </div>
-
-                            <div class="search-user-id">
-                                ${escapeHTML(user.id)}
-                            </div>
-                        </div>
-                    </button>
-                `
-            )
-            .join("");
-}
-
-/* =========================================================
-   PROFILE
-========================================================= */
-
-function renderProfile(userID) {
-    const profileCard =
-        document.getElementById(
-            "profileCard"
-        );
-
-    if (!profileCard) return;
-
-    const user =
-        getUserByID(userID);
-
-    const currentUser =
-        getCurrentUser();
-
-    if (!user || !currentUser) {
-        return;
-    }
-
-    if (
-        isBlockedBetween(
-            currentUser.id,
-            user.id
-        )
-    ) {
-        profileCard.innerHTML = `
-            <div class="center muted">
-                Этот профиль недоступен.
-            </div>
-        `;
-        return;
-    }
-
-    const posts =
-        getPosts().filter(
-            post =>
-                post.userId === user.id
-        );
-
-    const isSelf =
-        currentUser.id === user.id;
-
-    const following =
-        Array.isArray(
-            currentUser.following
-        ) &&
-        currentUser.following.includes(
-            user.id
-        );
-
-    profileCard.innerHTML = `
-        <div class="avatar large">
-            ${escapeHTML(
-                getInitial(user.username)
-            )}
-        </div>
-
-        <h2 class="profile-name">
-            ${escapeHTML(
-                user.username ||
-                "Nobody"
-            )}
-        </h2>
-
-        <div class="profile-id">
-            ${escapeHTML(user.id)}
-        </div>
-
-        ${
-            user.verified
-                ? `
-                    <div
-                        style="
-                            margin-top:8px;
-                            color:var(--accent);
-                            font-size:12px;
-                        "
-                    >
-                        ✓ verified
-                    </div>
-                `
-                : ""
-        }
-
-        ${
-            user.bio
-                ? `
-                    <p class="profile-bio">
-                        ${escapeHTML(user.bio)}
-                    </p>
-                `
-                : `
-                    <p class="profile-bio">
-                        Этот пользователь ничего о себе не написал.
-                    </p>
-                `
-        }
-
-        <div class="profile-stats">
-            <div class="stat">
-                <strong>${posts.length}</strong>
-                постов
-            </div>
-
-            <div class="stat">
-                <strong>
-                    ${user.followers?.length || 0}
-                </strong>
-                подписчиков
-            </div>
-
-            <div class="stat">
-                <strong>
-                    ${user.following?.length || 0}
-                </strong>
-                подписок
-            </div>
-
-            <div class="stat">
-                <strong>
-                    ${user.likesReceived || 0}
-                </strong>
-                лайков
-            </div>
-        </div>
-
-        ${
-            !isSelf
-                ? `
-                    <div
-                        style="
-                            margin-top:22px;
-                            display:flex;
-                            justify-content:center;
-                            gap:8px;
-                            flex-wrap:wrap;
-                        "
-                    >
-                        <button
-                            class="button ${
-                                following
-                                    ? "button-secondary"
-                                    : "button-primary"
-                            }"
-                            onclick="
-                                toggleFollow(
-                                    '${escapeHTML(user.id)}'
-                                )
-                            "
-                        >
-                            ${
-                                following
-                                    ? "Вы подписаны"
-                                    : "Подписаться"
-                            }
-                        </button>
-
-                        ${
-                            user.settings?.allowMessages !== false
-                                ? `
-                                    <button
-                                        class="button button-secondary"
-                                        onclick="
-                                            openChat(
-                                                '${escapeHTML(user.id)}'
-                                            )
-                                        "
-                                    >
-                                        💬 Написать
-                                    </button>
-                                `
-                                : ""
-                        }
-
-                        <button
-                            class="button button-secondary"
-                            onclick="
-                                visitRoom(
-                                    '${escapeHTML(user.id)}'
-                                )
-                            "
-                        >
-                            🏠 Комната
-                        </button>
-
-                        <button
-                            class="button button-danger"
-                            onclick="
-                                toggleBlock(
-                                    '${escapeHTML(user.id)}'
-                                )
-                            "
-                        >
-                            🚫 Заблокировать
-                        </button>
-                    </div>
-                `
-                : `
-                    <div
-                        style="margin-top:22px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap"
-                    >
-                        <button
-                            class="button button-secondary"
-                            onclick="editMyProfile()"
-                        >
-                            ✏️ Изменить профиль
-                        </button>
-
-                        <button
-                            class="button button-secondary"
-                            onclick="visitRoom('${escapeHTML(user.id)}')"
-                        >
-                            🏠 Моя комната
-                        </button>
-                    </div>
-                `
-        }
-    `;
-}
-
-/* =========================================================
-   FOLLOW
-========================================================= */
-
-function toggleFollow(targetID) {
-    const current =
-        getCurrentUser();
-
-    if (!current) return;
-
-    const users =
-        getUsers();
-
-    const me =
-        users.find(
-            user => user.id === current.id
-        );
-
-    const target =
-        users.find(
-            user => user.id === targetID
-        );
-
-    if (!me || !target) return;
-
-    if (
-        me.id === target.id
-    ) {
-        return;
-    }
-
-    if (!Array.isArray(me.following)) {
-        me.following = [];
-    }
-
-    if (!Array.isArray(target.followers)) {
-        target.followers = [];
-    }
-
-    const index =
-        me.following.indexOf(
-            target.id
-        );
-
-    if (index === -1) {
-        me.following.push(
-            target.id
-        );
-
-        if (
-            !target.followers.includes(
-                me.id
-            )
-        ) {
-            target.followers.push(
-                me.id
-            );
-        }
-
-        createNotification(
-            target.id,
-            "FOLLOW",
-            {
-                username: me.username
-            }
-        );
-
-        showToast(
-            "Подписка оформлена"
-        );
-    } else {
-        me.following.splice(
-            index,
-            1
-        );
-
-        const followerIndex =
-            target.followers.indexOf(
-                me.id
-            );
-
-        if (followerIndex !== -1) {
-            target.followers.splice(
-                followerIndex,
-                1
-            );
-        }
-
-        showToast(
-            "Подписка отменена"
-        );
-    }
-
-    saveUsers(users);
-
-    renderProfile(
-        targetID
-    );
-}
-
-/* =========================================================
-   BLOCK SYSTEM
-========================================================= */
-
-function getBlocks() {
-    return readStorage(
-        STORAGE.BLOCKS,
-        {}
-    );
-}
-
-function saveBlocks(blocks) {
-    return writeStorage(
-        STORAGE.BLOCKS,
-        blocks
-    );
-}
-
-function isBlockedBetween(
-    firstID,
-    secondID
-) {
-    const blocks = getBlocks();
-
-    return (
-        Array.isArray(
-            blocks[firstID]
-        ) &&
-        blocks[firstID].includes(
-            secondID
-        )
-    ) || (
-        Array.isArray(
-            blocks[secondID]
-        ) &&
-        blocks[secondID].includes(
-            firstID
-        )
-    );
-}
-
-function toggleBlock(targetID) {
-    const user =
-        getCurrentUser();
-
-    if (!user) return;
-
-    if (user.id === targetID) {
-        return;
-    }
-
-    const blocks =
-        getBlocks();
-
-    if (!Array.isArray(blocks[user.id])) {
-        blocks[user.id] = [];
-    }
-
-    const index =
-        blocks[user.id].indexOf(
-            targetID
-        );
-
-    if (index === -1) {
-        blocks[user.id].push(
-            targetID
-        );
-
-        showToast(
-            "Пользователь заблокирован"
-        );
-    } else {
-        blocks[user.id].splice(
-            index,
-            1
-        );
-
-        showToast(
-            "Блокировка снята"
-        );
-    }
-
-    saveBlocks(blocks);
-
-    showPage("home");
-}
-
-/* =========================================================
-   NAVIGATION
-========================================================= */
-
-const pages = [
-    "home",
-    "explore",
-    "profile",
-    "settings",
-    "owner"
-];
-
-function showPage(page) {
-    const user =
-        getCurrentUser();
-
-    if (!user) return;
-
-    pages.forEach(
-        pageName => {
-            const element =
-                document.getElementById(
-                    `${pageName}Page`
-                );
-
-            if (!element) return;
-
-            element.classList.toggle(
-                "hidden",
-                pageName !== page
-            );
-        }
-    );
-
-    document
-        .querySelectorAll(
-            ".nav-button"
-        )
-        .forEach(button => {
-            button.classList.toggle(
-                "active",
-                button.dataset.page === page
-            );
-        });
-
-    if (page === "home") {
-        renderFeed();
-    }
-
-    if (page === "profile") {
-        renderProfile(user.id);
-    }
-
-    if (page === "settings") {
-        renderSettings();
-    }
-
-    if (page === "owner") {
-        if (
-            user.role !==
-            NOBODY.ownerRole
-        ) {
-            showPage("home");
-            return;
-        }
-
-        renderOwnerPanel();
-    }
-}
-
-/* =========================================================
-   NAV EVENTS
-========================================================= */
-
-const bottomNav =
-    document.getElementById(
-        "bottomNav"
-    );
-
-if (bottomNav) {
-    bottomNav.addEventListener(
-        "click",
-        event => {
-            const button =
-                event.target.closest(
-                    "button"
-                );
-
-            if (!button) return;
-
-            if (
-                button.dataset.action ===
-                "create"
-            ) {
-                openPostModal();
-                return;
-            }
-
-            if (
-                button.dataset.page
-            ) {
-                showPage(
-                    button.dataset.page
-                );
-            }
-        }
-    );
-}
-
-/* =========================================================
-   OPEN PROFILE
-========================================================= */
-
-function openUserProfile(userID) {
-    const user =
-        getUserByID(userID);
-
-    if (!user) {
-        showToast(
-            "Пользователь не найден"
-        );
-        return;
-    }
-
-    showPage("profile");
-
-    renderProfile(
-        userID
-    );
-}
-
-/* =========================================================
-   PROFILE EDIT
-========================================================= */
-
-function editMyProfile() {
-    const user =
-        getCurrentUser();
-
-    if (!user) return;
-
-    const bio =
-        prompt(
-            "Введите новое описание профиля:",
-            user.bio || ""
-        );
-
-    if (bio === null) {
-        return;
-    }
-
-    const users =
-        getUsers();
-
-    const storedUser =
-        users.find(
-            item => item.id === user.id
-        );
-
-    if (!storedUser) return;
-
-    storedUser.bio =
-        sanitizeText(
-            bio,
-            500
-        );
-
-    saveUsers(users);
-
-    renderProfile(
-        user.id
-    );
-
-    showToast(
-        "Профиль обновлён"
-    );
-}
-
-/* =========================================================
-   POST MODAL
-========================================================= */
-
-const postModal =
-    document.getElementById(
-        "postModal"
-    );
-
-function openPostModal() {
-    if (!postModal) return;
-
-    postModal.classList.remove(
-        "hidden"
-    );
-
-    const textarea =
-        document.getElementById(
-            "postText"
-        );
-
-    if (textarea) {
-        textarea.focus();
-    }
-}
-
-function closePostModal() {
-    if (!postModal) return;
-
-    postModal.classList.add(
-        "hidden"
-    );
-}
-
-const createPostButton =
-    document.getElementById(
-        "createPostButton"
-    );
-
-if (createPostButton) {
-    createPostButton.addEventListener(
-        "click",
-        openPostModal
-    );
-}
-
-const closePostModalButton =
-    document.getElementById(
-        "closePostModal"
-    );
-
-if (closePostModalButton) {
-    closePostModalButton.addEventListener(
-        "click",
-        closePostModal
-    );
-}
-
-const postForm =
-    document.getElementById(
-        "postForm"
-    );
-
-if (postForm) {
-    postForm.addEventListener(
-        "submit",
-        event => {
-            event.preventDefault();
-
-            const textarea =
-                document.getElementById(
-                    "postText"
-                );
-
-            const result =
-                createPost(
-                    textarea.value
-                );
-
-            if (!result.success) {
-                showToast(
-                    result.message
-                );
-                return;
-            }
-
-            textarea.value = "";
-
-            closePostModal();
-
-            renderFeed();
-
-            showToast(
-                "Пост опубликован ✨"
-            );
-        }
-    );
-}
-
-/* =========================================================
-   RULES
-========================================================= */
-
-const rulesModal =
-    document.getElementById(
-        "rulesModal"
-    );
-
-const rulesButton =
-    document.getElementById(
-        "rulesButton"
-    );
-
-const closeRulesModal =
-    document.getElementById(
-        "closeRulesModal"
-    );
-
-if (rulesButton) {
-    rulesButton.addEventListener(
-        "click",
-        () => {
-            rulesModal?.classList.remove(
-                "hidden"
-            );
-        }
-    );
-}
-
-if (closeRulesModal) {
-    closeRulesModal.addEventListener(
-        "click",
-        () => {
-            rulesModal?.classList.add(
-                "hidden"
-            );
-        }
-    );
-}
-
-/* =========================================================
+/* =========================
    THEME
-========================================================= */
+========================= */
 
 function applyTheme(theme) {
-    if (
-        theme !== "dark" &&
-        theme !== "light" &&
-        theme !== "system"
-    ) {
-        theme = NOBODY.defaultTheme;
-    }
+  state.theme = theme;
+  localStorage.setItem("nobody_theme", theme);
 
-    let actualTheme = theme;
+  const root = document.documentElement;
 
-    if (theme === "system") {
-        actualTheme =
-            window.matchMedia(
-                "(prefers-color-scheme: dark)"
-            ).matches
-                ? "dark"
-                : "light";
-    }
+  if (theme === "system") {
+    root.removeAttribute("data-theme");
+    root.classList.remove("dark");
+    return;
+  }
 
-    document.documentElement.dataset.theme =
-        actualTheme;
+  root.dataset.theme = theme;
+
+  if (theme === "dark") {
+    root.classList.add("dark");
+  } else {
+    root.classList.remove("dark");
+  }
+
+  const select = $("#themeSelect");
+
+  if (select) {
+    select.value = theme;
+  }
 }
 
-function loadTheme() {
-    const saved =
-        localStorage.getItem(
-            STORAGE.THEME
-        ) ||
-        NOBODY.defaultTheme;
+function toggleTheme() {
+  const next =
+    state.theme === "light"
+      ? "dark"
+      : "light";
 
-    applyTheme(saved);
-
-    const select =
-        document.getElementById(
-            "themeSelect"
-        );
-
-    if (select) {
-        select.value = saved;
-    }
+  applyTheme(next);
 }
 
-const themeSelect =
-    document.getElementById(
-        "themeSelect"
+/* =========================
+   SCREENS
+========================= */
+
+function hideAllScreens() {
+  $$(".screen").forEach(screen => {
+    screen.classList.add("hidden");
+  });
+}
+
+function showScreen(id) {
+  hideAllScreens();
+
+  const screen = document.getElementById(id);
+
+  if (screen) {
+    screen.classList.remove("hidden");
+  }
+}
+
+function openAuth() {
+  showScreen("authFormScreen");
+
+  const formScreen = $("#authFormScreen");
+
+  if (formScreen) {
+    formScreen.classList.remove("hidden");
+  }
+}
+
+function showLoginForm() {
+  state.authMode = "login";
+
+  $("#authEyebrow").textContent = "WELCOME BACK";
+  $("#authFormTitle").textContent = "Войти";
+  $("#authFormDescription").textContent =
+    "Вернись в свой анонимный мир.";
+
+  $("#authSubmit").textContent = "Войти";
+
+  $("#passwordConfirmField")?.classList.add("hidden");
+  $("#nicknameOptionalField")?.classList.add("hidden");
+
+  $("#loginTab")?.classList.add("active");
+  $("#registerTab")?.classList.remove("active");
+
+  $("#passwordInput")?.setAttribute(
+    "autocomplete",
+    "current-password"
+  );
+
+  setMessage($("#authMessage"), "");
+}
+
+function showRegisterForm() {
+  state.authMode = "register";
+
+  $("#authEyebrow").textContent = "CREATE ACCOUNT";
+  $("#authFormTitle").textContent =
+    "Создать аккаунт";
+
+  $("#authFormDescription").textContent =
+    "Придумай nobody-личность.";
+
+  $("#authSubmit").textContent =
+    "Создать аккаунт";
+
+  $("#passwordConfirmField")?.classList.remove("hidden");
+  $("#nicknameOptionalField")?.classList.remove("hidden");
+
+  $("#loginTab")?.classList.remove("active");
+  $("#registerTab")?.classList.add("active");
+
+  $("#passwordInput")?.setAttribute(
+    "autocomplete",
+    "new-password"
+  );
+
+  setMessage($("#authMessage"), "");
+}
+
+function enterApp() {
+  $("#topbar")?.classList.remove("hidden");
+  $("#bottomNav")?.classList.remove("hidden");
+  $("#headerProfileButton")?.classList.remove("hidden");
+
+  showScreen("homePage");
+
+  state.currentPage = "home";
+
+  updateNavigation();
+  updateUserUI();
+
+  loadFeed();
+}
+
+function leaveApp() {
+  $("#bottomNav")?.classList.add("hidden");
+  $("#headerProfileButton")?.classList.add("hidden");
+
+  showScreen("authScreen");
+}
+
+/* =========================
+   USER UI
+========================= */
+
+function updateUserUI() {
+  if (!state.user) return;
+
+  const username =
+    state.user.username || "nobody";
+
+  const displayName =
+    state.user.displayName ||
+    username;
+
+  const welcome = $("#welcomeText");
+  const description = $("#welcomeDescription");
+
+  if (welcome) {
+    welcome.textContent =
+      `Привет, ${displayName}.`;
+  }
+
+  if (description) {
+    description.textContent =
+      `Ты вошёл как @${username}.`;
+  }
+
+  const headerAvatar =
+    $("#headerProfileButton");
+
+  if (headerAvatar) {
+    headerAvatar.textContent =
+      initials(state.user);
+  }
+
+  const composerAvatar =
+    $("#composerAvatar");
+
+  if (composerAvatar) {
+    composerAvatar.textContent =
+      initials(state.user);
+  }
+
+  const composerUsername =
+    $("#composerUsername");
+
+  if (composerUsername) {
+    composerUsername.textContent =
+      `@${username}`;
+  }
+
+  const roomOwner =
+    $("#roomOwnerLabel");
+
+  if (roomOwner) {
+    roomOwner.textContent =
+      `@${username}`;
+  }
+}
+
+/* =========================
+   AUTH
+========================= */
+
+async function submitAuth(event) {
+  event.preventDefault();
+
+  const username =
+    $("#usernameInput")?.value.trim();
+
+  const password =
+    $("#passwordInput")?.value || "";
+
+  const message =
+    $("#authMessage");
+
+  if (!username) {
+    setMessage(
+      message,
+      "Введи ник."
+    );
+    return;
+  }
+
+  if (password.length < 6) {
+    setMessage(
+      message,
+      "Пароль должен содержать минимум 6 символов."
+    );
+    return;
+  }
+
+  if (state.authMode === "register") {
+    const confirm =
+      $("#passwordConfirmInput")?.value || "";
+
+    if (password !== confirm) {
+      setMessage(
+        message,
+        "Пароли не совпадают."
+      );
+      return;
+    }
+  }
+
+  const submit =
+    $("#authSubmit");
+
+  if (submit) {
+    submit.disabled = true;
+    submit.dataset.loading = "true";
+  }
+
+  try {
+    const endpoint =
+      state.authMode === "login"
+        ? "/auth/login"
+        : "/auth/register";
+
+    const result = await api(endpoint, {
+      method: "POST",
+      body: JSON.stringify({
+        username,
+        password
+      })
+    });
+
+    setToken(result.token);
+    state.user = result.user;
+
+    setMessage(
+      message,
+      "Готово!",
+      "success"
     );
 
-if (themeSelect) {
-    themeSelect.addEventListener(
-        "change",
-        event => {
-            const theme =
-                event.target.value;
+    $("#authForm")?.reset();
 
-            localStorage.setItem(
-                STORAGE.THEME,
-                theme
-            );
-
-            applyTheme(
-                theme
-            );
-        }
-    );
-}
-
-const themeButton =
-    document.getElementById(
-        "themeButton"
-    );
-
-if (themeButton) {
-    themeButton.addEventListener(
-        "click",
-        () => {
-            const current =
-                document.documentElement
-                    .dataset.theme;
-
-            const next =
-                current === "dark"
-                    ? "light"
-                    : "dark";
-
-            localStorage.setItem(
-                STORAGE.THEME,
-                next
-            );
-
-            applyTheme(next);
-
-            if (themeSelect) {
-                themeSelect.value =
-                    next;
-            }
-        }
-    );
-}
-
-window
-    .matchMedia(
-        "(prefers-color-scheme: dark)"
-    )
-    .addEventListener(
-        "change",
-        () => {
-            const saved =
-                localStorage.getItem(
-                    STORAGE.THEME
-                );
-
-            if (saved === "system") {
-                applyTheme(
-                    "system"
-                );
-            }
-        }
-    );
-
-/* =========================================================
-   HEADER PROFILE
-========================================================= */
-
-const headerProfileButton =
-    document.getElementById(
-        "headerProfileButton"
-    );
-
-if (headerProfileButton) {
-    headerProfileButton.addEventListener(
-        "click",
-        () => {
-            const user =
-                getCurrentUser();
-
-            if (!user) return;
-
-            showPage("profile");
-
-            renderProfile(
-                user.id
-            );
-        }
-    );
-}
-
-/* =========================================================
-   SETTINGS
-========================================================= */
-
-function renderSettings() {
-    const user =
-        getCurrentUser();
-
-    if (!user) return;
-
-    const select =
-        document.getElementById(
-            "themeSelect"
-        );
-
-    if (select) {
-        select.value =
-            localStorage.getItem(
-                STORAGE.THEME
-            ) || "system";
-    }
-}
-
-/* =========================================================
-   MESSAGES
-========================================================= */
-
-function getMessages() {
-    return readStorage(
-        STORAGE.MESSAGES,
-        []
-    );
-}
-
-function saveMessages(messages) {
-    return writeStorage(
-        STORAGE.MESSAGES,
-        messages
-    );
-}
-
-function getConversation(
-    firstUserID,
-    secondUserID
-) {
-    return getMessages()
-        .filter(message =>
-            (
-                message.senderID ===
-                    firstUserID &&
-                message.receiverID ===
-                    secondUserID
-            ) ||
-            (
-                message.senderID ===
-                    secondUserID &&
-                message.receiverID ===
-                    firstUserID
-            )
-        )
-        .sort(
-            (a, b) =>
-                a.createdAt -
-                b.createdAt
-        );
-}
-
-function sendMessage(
-    receiverID,
-    text
-) {
-    const sender =
-        getCurrentUser();
-
-    if (!sender) {
-        return {
-            success: false,
-            message: "Нужно войти."
-        };
-    }
-
-    if (
-        sender.id === receiverID
-    ) {
-        return {
-            success: false,
-            message:
-                "Нельзя отправить сообщение самому себе."
-        };
-    }
-
-    const receiver =
-        getUserByID(
-            receiverID
-        );
-
-    if (!receiver) {
-        return {
-            success: false,
-            message:
-                "Пользователь не найден."
-        };
-    }
-
-    if (
-        isBlockedBetween(
-            sender.id,
-            receiver.id
-        )
-    ) {
-        return {
-            success: false,
-            message:
-                "Нельзя отправить сообщение этому пользователю."
-        };
-    }
-
-    if (
-        receiver.settings &&
-        receiver.settings.allowMessages === false
-    ) {
-        return {
-            success: false,
-            message:
-                "Пользователь отключил личные сообщения."
-        };
-    }
-
-    const cleanText =
-        sanitizeText(
-            text,
-            NOBODY.maxMessageLength
-        );
-
-    if (!cleanText) {
-        return {
-            success: false,
-            message:
-                "Сообщение пустое."
-        };
-    }
-
-    const messages =
-        getMessages();
-
-    const message = {
-        id: generateMessageID(),
-        senderID: sender.id,
-        receiverID: receiver.id,
-        text: cleanText,
-        createdAt: Date.now(),
-        deletedFor: [],
-        read: false
-    };
-
-    messages.push(message);
-
-    saveMessages(messages);
-
-    createNotification(
-        receiver.id,
-        "MESSAGE",
-        {
-            username:
-                sender.username
-        }
-    );
-
-    return {
-        success: true,
-        message
-    };
-}
-
-/* =========================================================
-   DELETE MESSAGE
-========================================================= */
-
-function deleteMessage(
-    messageID
-) {
-    const user =
-        getCurrentUser();
-
-    if (!user) return false;
-
-    const messages =
-        getMessages();
-
-    const message =
-        messages.find(
-            item =>
-                item.id === messageID
-        );
-
-    if (!message) return false;
-
-    if (
-        message.senderID !== user.id &&
-        message.receiverID !== user.id &&
-        user.role !== NOBODY.ownerRole
-    ) {
-        return false;
-    }
-
-    message.deletedFor =
-        Array.isArray(
-            message.deletedFor
-        )
-            ? message.deletedFor
-            : [];
-
-    if (
-        !message.deletedFor.includes(
-            user.id
-        )
-    ) {
-        message.deletedFor.push(
-            user.id
-        );
-    }
-
-    saveMessages(messages);
-
-    return true;
-}
-
-/* =========================================================
-   CHAT UI FOUNDATION
-========================================================= */
-
-let activeChatUserID = null;
-
-function openChat(userID) {
-    const target =
-        getUserByID(userID);
-
-    if (!target) return;
-
-    activeChatUserID =
-        target.id;
+    await loadMe();
+    enterApp();
 
     showToast(
-        `Чат с ${target.username}`
+      state.authMode === "login"
+        ? "Добро пожаловать обратно 👋"
+        : "Аккаунт создан ✦",
+      "success"
+    );
+  } catch (error) {
+    setMessage(
+      message,
+      error.message
+    );
+  } finally {
+    if (submit) {
+      submit.disabled = false;
+      delete submit.dataset.loading;
+    }
+  }
+}
+
+async function loadMe() {
+  if (!state.token) {
+    return false;
+  }
+
+  try {
+    const result =
+      await api("/auth/me");
+
+    state.user =
+      result.user;
+
+    return true;
+  } catch {
+    setToken("");
+    state.user = null;
+    return false;
+  }
+}
+
+async function logout() {
+  try {
+    if (state.token) {
+      await api("/auth/logout", {
+        method: "POST"
+      });
+    }
+  } catch {
+    // локальный выход всё равно выполняется
+  }
+
+  setToken("");
+  state.user = null;
+  state.currentChat = null;
+
+  leaveApp();
+
+  showToast(
+    "Ты вышел из аккаунта.",
+    "success"
+  );
+}
+
+/* =========================
+   NAVIGATION
+========================= */
+
+function navigate(page) {
+  state.currentPage = page;
+
+  const pages = {
+    home: "homePage",
+    explore: "explorePage",
+    profile: "profilePage",
+    messages: "messagesPage",
+    games: "gamesPage",
+    room: "roomPage",
+    settings: "settingsPage",
+    owner: "ownerPage"
+  };
+
+  const target = pages[page];
+
+  if (!target) {
+    return;
+  }
+
+  showScreen(target);
+  updateNavigation();
+
+  $("#moreMenu")?.classList.add("hidden");
+
+  if (page === "home") {
+    loadFeed();
+  }
+
+  if (page === "profile") {
+    loadOwnProfile();
+  }
+
+  if (page === "messages") {
+    loadConversations();
+  }
+
+  if (page === "room") {
+    loadRoom();
+  }
+
+  if (page === "owner") {
+    loadOwner();
+  }
+}
+
+function updateNavigation() {
+  $$(".nav-button").forEach(button => {
+    button.classList.remove("active");
+
+    if (
+      button.dataset.page ===
+      state.currentPage
+    ) {
+      button.classList.add("active");
+    }
+  });
+}
+
+/* =========================
+   FEED
+========================= */
+
+async function loadFeed() {
+  const feed = $("#feed");
+
+  if (!feed) return;
+
+  feed.innerHTML = `
+    <div class="loading-state">
+      Загружаем ленту...
+    </div>
+  `;
+
+  try {
+    const result =
+      await api("/posts");
+
+    state.posts =
+      result.posts || [];
+
+    renderFeed();
+  } catch (error) {
+    feed.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-icon">!</div>
+        <strong>Не удалось загрузить ленту</strong>
+        <p>${escapeHTML(error.message)}</p>
+      </div>
+    `;
+  }
+}
+
+function renderFeed(posts = state.posts) {
+  const feed = $("#feed");
+
+  if (!feed) return;
+
+  if (!posts.length) {
+    feed.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-icon">✦</div>
+        <strong>Здесь пока тихо</strong>
+        <p>Создай первый пост в NOBODY.</p>
+      </div>
+    `;
+
+    return;
+  }
+
+  feed.innerHTML =
+    posts.map(renderPost).join("");
+
+  bindPostButtons();
+}
+
+function renderPost(post) {
+  const author =
+    post.author || {};
+
+  const username =
+    author.username || "anonymous";
+
+  const displayName =
+    author.displayName ||
+    username;
+
+  const liked =
+    post.liked ? "liked" : "";
+
+  return `
+    <article
+      class="post-card"
+      data-post-id="${escapeHTML(post.id)}"
+    >
+      <div class="post-header">
+        <button
+          class="post-author"
+          data-user-id="${escapeHTML(author.id || "")}"
+          type="button"
+        >
+          <div class="avatar">
+            ${initials(author)}
+          </div>
+
+          <div class="post-author-info">
+            <strong>
+              ${escapeHTML(displayName)}
+            </strong>
+
+            <span>
+              @${escapeHTML(username)}
+              ·
+              ${escapeHTML(formatDate(post.createdAt))}
+            </span>
+          </div>
+        </button>
+
+        ${
+          author.id === state.user?.id
+            ? `
+              <button
+                class="post-more"
+                data-delete-post="${escapeHTML(post.id)}"
+                type="button"
+              >
+                •••
+              </button>
+            `
+            : ""
+        }
+      </div>
+
+      <div class="post-body">
+        ${escapeHTML(post.text).replaceAll("\n", "<br>")}
+      </div>
+
+      <div class="post-actions">
+        <button
+          class="post-action like-button ${liked}"
+          data-like-post="${escapeHTML(post.id)}"
+          type="button"
+        >
+          ♡
+          <span>${post.likes || 0}</span>
+        </button>
+
+        <button
+          class="post-action"
+          type="button"
+          data-comment-post="${escapeHTML(post.id)}"
+        >
+          ◌
+          <span>${post.comments || 0}</span>
+        </button>
+
+        <button
+          class="post-action share-post"
+          data-share-post="${escapeHTML(post.id)}"
+          type="button"
+        >
+          ↗
+        </button>
+      </div>
+    </article>
+  `;
+}
+
+function bindPostButtons() {
+  $$("[data-like-post]").forEach(button => {
+    button.addEventListener(
+      "click",
+      () => likePost(
+        button.dataset.likePost
+      )
+    );
+  });
+
+  $$("[data-delete-post]").forEach(button => {
+    button.addEventListener(
+      "click",
+      () => deletePost(
+        button.dataset.deletePost
+      )
+    );
+  });
+
+  $$("[data-comment-post]").forEach(button => {
+    button.addEventListener(
+      "click",
+      () => {
+        showToast(
+          "Комментарии будут добавлены следующим модулем."
+        );
+      }
+    );
+  });
+
+  $$("[data-share-post]").forEach(button => {
+    button.addEventListener(
+      "click",
+      async () => {
+        const postId =
+          button.dataset.sharePost;
+
+        const url =
+          `${location.origin}${location.pathname}#post=${postId}`;
+
+        try {
+          await navigator.clipboard.writeText(url);
+          showToast(
+            "Ссылка на пост скопирована.",
+            "success"
+          );
+        } catch {
+          showToast(
+            "Не удалось скопировать ссылку."
+          );
+        }
+      }
+    );
+  });
+
+  $$("[data-user-id]").forEach(button => {
+    button.addEventListener(
+      "click",
+      () => {
+        const userId =
+          button.dataset.userId;
+
+        if (userId) {
+          openUserProfile(userId);
+        }
+      }
+    );
+  });
+}
+
+async function likePost(postId) {
+  try {
+    const result =
+      await api(`/posts/${postId}/like`, {
+        method: "POST"
+      });
+
+    const post =
+      state.posts.find(
+        item => item.id === postId
+      );
+
+    if (post) {
+      post.likes = result.likes;
+      post.liked = result.liked;
+    }
+
+    renderFeed();
+  } catch (error) {
+    showToast(error.message);
+  }
+}
+
+async function deletePost(postId) {
+  const confirmed =
+    confirm("Удалить этот пост?");
+
+  if (!confirmed) {
+    return;
+  }
+
+  try {
+    await api(`/posts/${postId}`, {
+      method: "DELETE"
+    });
+
+    state.posts =
+      state.posts.filter(
+        post => post.id !== postId
+      );
+
+    renderFeed();
+
+    showToast(
+      "Пост удалён.",
+      "success"
+    );
+  } catch (error) {
+    showToast(error.message);
+  }
+}
+
+/* =========================
+   CREATE POST
+========================= */
+
+function openModal(id) {
+  const modal =
+    document.getElementById(id);
+
+  if (!modal) return;
+
+  modal.classList.remove("hidden");
+  document.body.classList.add("modal-open");
+}
+
+function closeModal(id) {
+  const modal =
+    document.getElementById(id);
+
+  if (!modal) return;
+
+  modal.classList.add("hidden");
+
+  if (
+    !document.querySelector(
+      ".modal:not(.hidden)"
+    )
+  ) {
+    document.body.classList.remove(
+      "modal-open"
+    );
+  }
+}
+
+function closeAllModals() {
+  $$(".modal").forEach(modal => {
+    modal.classList.add("hidden");
+  });
+
+  document.body.classList.remove(
+    "modal-open"
+  );
+}
+
+async function createPost(event) {
+  event.preventDefault();
+
+  const textarea =
+    $("#postText");
+
+  const message =
+    $("#postMessage");
+
+  const text =
+    textarea?.value.trim() || "";
+
+  if (!text) {
+    setMessage(
+      message,
+      "Напиши что-нибудь."
+    );
+    return;
+  }
+
+  try {
+    const result =
+      await api("/posts", {
+        method: "POST",
+        body: JSON.stringify({ text })
+      });
+
+    state.posts.unshift(
+      result.post
     );
 
-    /*
-        Полноценное окно ЛС будет
-        подключено к отдельной странице
-        в следующем UI-модуле.
-    */
+    $("#postForm")?.reset();
 
-    showPage("profile");
+    updatePostCounter();
+    closeModal("postModal");
+    renderFeed();
+
+    showToast(
+      "Пост опубликован ✦",
+      "success"
+    );
+  } catch (error) {
+    setMessage(
+      message,
+      error.message
+    );
+  }
+}
+
+function updatePostCounter() {
+  const textarea =
+    $("#postText");
+
+  const counter =
+    $("#postCounter");
+
+  if (!textarea || !counter) {
+    return;
+  }
+
+  counter.textContent =
+    `${textarea.value.length} / 2000`;
+}
+
+/* =========================
+   SEARCH
+========================= */
+
+let searchTimer = null;
+
+function setupSearch() {
+  const input =
+    $("#searchInput");
+
+  if (!input) return;
+
+  input.addEventListener(
+    "input",
+    () => {
+      const query =
+        input.value.trim();
+
+      $("#searchClearButton")
+        ?.classList.toggle(
+          "hidden",
+          !query
+        );
+
+      clearTimeout(searchTimer);
+
+      if (!query) {
+        renderEmptySearch();
+        return;
+      }
+
+      searchTimer = setTimeout(
+        () => searchUsers(query),
+        300
+      );
+    }
+  );
+
+  $("#searchClearButton")
+    ?.addEventListener(
+      "click",
+      () => {
+        input.value = "";
+        input.dispatchEvent(
+          new Event("input")
+        );
+      }
+    );
+
+  $$(".suggestion-chip").forEach(
+    chip => {
+      chip.addEventListener(
+        "click",
+        () => {
+          input.value =
+            chip.dataset.searchExample || "";
+
+          input.dispatchEvent(
+            new Event("input")
+          );
+        }
+      );
+    }
+  );
+}
+
+function renderEmptySearch() {
+  const results =
+    $("#searchResults");
+
+  if (!results) return;
+
+  results.innerHTML = `
+    <div class="empty-state compact">
+      <div class="empty-icon">⌕</div>
+      <strong>Кого сегодня найдём?</strong>
+      <p>Введи хотя бы несколько символов.</p>
+    </div>
+  `;
+}
+
+async function searchUsers(query) {
+  const results =
+    $("#searchResults");
+
+  if (!results) return;
+
+  results.innerHTML = `
+    <div class="loading-state">
+      Ищем...
+    </div>
+  `;
+
+  try {
+    const result =
+      await api(
+        `/users/search?q=${encodeURIComponent(query)}`
+      );
+
+    renderSearchResults(
+      result.users || []
+    );
+  } catch (error) {
+    results.innerHTML = `
+      <div class="empty-state compact">
+        <strong>Ошибка поиска</strong>
+        <p>${escapeHTML(error.message)}</p>
+      </div>
+    `;
+  }
+}
+
+function renderSearchResults(users) {
+  const results =
+    $("#searchResults");
+
+  if (!results) return;
+
+  if (!users.length) {
+    results.innerHTML = `
+      <div class="empty-state compact">
+        <div class="empty-icon">⌕</div>
+        <strong>Никого не нашли</strong>
+        <p>Попробуй другой запрос.</p>
+      </div>
+    `;
+
+    return;
+  }
+
+  results.innerHTML =
+    users.map(user => `
+      <button
+        class="user-result"
+        data-search-user="${escapeHTML(user.id)}"
+        type="button"
+      >
+        <div class="avatar">
+          ${initials(user)}
+        </div>
+
+        <div class="user-result-info">
+          <strong>
+            ${escapeHTML(user.displayName)}
+          </strong>
+
+          <span>
+            @${escapeHTML(user.username)}
+          </span>
+
+          ${
+            user.anonymousId
+              ? `
+                <small>
+                  ${escapeHTML(user.anonymousId)}
+                </small>
+              `
+              : ""
+          }
+        </div>
+
+        <span class="setting-arrow">
+          ›
+        </span>
+      </button>
+    `).join("");
+
+  $$("[data-search-user]")
+    .forEach(button => {
+      button.addEventListener(
+        "click",
+        () => openUserProfile(
+          button.dataset.searchUser
+        )
+      );
+    });
+}
+
+/* =========================
+   PROFILE
+========================= */
+
+async function loadOwnProfile() {
+  if (!state.user) return;
+
+  try {
+    const result =
+      await api("/users/me");
+
+    state.user = {
+      ...state.user,
+      ...result.user
+    };
 
     renderProfile(
-        target.id
+      state.user,
+      true
     );
+
+    const postsResult =
+      await api(
+        `/users/${state.user.id}/posts`
+      );
+
+    const profileFeed =
+      $("#profileFeed");
+
+    if (profileFeed) {
+      const posts =
+        postsResult.posts || [];
+
+      profileFeed.innerHTML =
+        posts.length
+          ? posts.map(renderPost).join("")
+          : `
+            <div class="empty-state">
+              <div class="empty-icon">✦</div>
+              <strong>Пока нет публикаций</strong>
+              <p>Создай свой первый пост.</p>
+            </div>
+          `;
+
+      bindPostButtons();
+    }
+  } catch (error) {
+    showToast(error.message);
+  }
 }
 
-/* =========================================================
-   NOTIFICATIONS
-========================================================= */
+function renderProfile(user, own = false) {
+  const card =
+    $("#profileCard");
 
-function getNotifications() {
-    return readStorage(
-        STORAGE.NOTIFICATIONS,
-        []
-    );
-}
+  if (!card) return;
 
-function saveNotifications(
-    notifications
-) {
-    return writeStorage(
-        STORAGE.NOTIFICATIONS,
-        notifications
-    );
-}
+  card.innerHTML = `
+    <div class="profile-avatar avatar large">
+      ${initials(user)}
+    </div>
 
-function createNotification(
-    userID,
-    type,
-    data = {}
-) {
-    const notifications =
-        getNotifications();
+    <div class="profile-main">
+      <div class="profile-name-row">
+        <div>
+          <h1>
+            ${escapeHTML(
+              user.displayName ||
+              user.username
+            )}
+          </h1>
 
-    notifications.unshift({
-        id: generateNotificationID(),
-        userID,
-        type,
-        data,
-        read: false,
-        createdAt: Date.now()
-    });
+          <p>
+            @${escapeHTML(user.username)}
+          </p>
+        </div>
 
-    saveNotifications(
-        notifications
-    );
-}
-
-function getUserNotifications(
-    userID
-) {
-    return getNotifications()
-        .filter(
-            notification =>
-                notification.userID ===
-                userID
-        );
-}
-
-function getUnreadNotificationCount(
-    userID
-) {
-    return getUserNotifications(
-        userID
-    ).filter(
-        notification =>
-            !notification.read
-    ).length;
-}
-
-function markAllNotificationsRead(
-    userID
-) {
-    const notifications =
-        getNotifications();
-
-    notifications.forEach(
-        notification => {
-            if (
-                notification.userID ===
-                    userID
-            ) {
-                notification.read = true;
-            }
+        ${
+          own
+            ? `
+              <button
+                class="secondary-button"
+                id="profileInlineEdit"
+                type="button"
+              >
+                Редактировать
+              </button>
+            `
+            : `
+              <button
+                class="primary-button"
+                id="profileMessageButton"
+                type="button"
+              >
+                Написать
+              </button>
+            `
         }
-    );
+      </div>
 
-    saveNotifications(
-        notifications
-    );
+      <p class="profile-bio">
+        ${
+          escapeHTML(
+            user.bio ||
+            "Этот nobody пока ничего о себе не рассказал."
+          )
+        }
+      </p>
+
+      ${
+        user.anonymousId
+          ? `
+            <span class="profile-id">
+              ${escapeHTML(user.anonymousId)}
+            </span>
+          `
+          : ""
+      }
+    </div>
+  `;
+
+  if (own) {
+    $("#profileInlineEdit")
+      ?.addEventListener(
+        "click",
+        openProfileEditor
+      );
+  } else {
+    $("#profileMessageButton")
+      ?.addEventListener(
+        "click",
+        () => {
+          closeModal("userProfileModal");
+          navigate("messages");
+          openChat(user.id);
+        }
+      );
+  }
+
+  const info =
+    $("#profileInfo");
+
+  if (info) {
+    info.innerHTML = `
+      <div>
+        <span>Ник</span>
+        <strong>
+          @${escapeHTML(user.username)}
+        </strong>
+      </div>
+
+      <div>
+        <span>Anonymous ID</span>
+        <strong>
+          ${
+            user.anonymousId
+              ? escapeHTML(user.anonymousId)
+              : "скрыт"
+          }
+        </strong>
+      </div>
+
+      <div>
+        <span>В NOBODY с</span>
+        <strong>
+          ${escapeHTML(
+            new Date(
+              user.createdAt
+            ).toLocaleDateString(
+              "ru-RU"
+            )
+          )}
+        </strong>
+      </div>
+    `;
+  }
 }
 
-/* =========================================================
-   REPORT SYSTEM
-========================================================= */
+async function openUserProfile(userId) {
+  try {
+    const result =
+      await api(`/users/${userId}`);
 
-function getReports() {
-    return readStorage(
-        STORAGE.REPORTS,
-        []
-    );
-}
+    const content =
+      $("#userProfileModalContent");
 
-function saveReports(reports) {
-    return writeStorage(
-        STORAGE.REPORTS,
-        reports
-    );
-}
+    if (!content) return;
 
-function createReport(
-    targetType,
-    targetID,
-    reason
-) {
     const user =
-        getCurrentUser();
+      result.user;
 
-    if (!user) return false;
+    content.innerHTML = `
+      <div class="public-profile">
+        <div class="avatar large">
+          ${initials(user)}
+        </div>
 
-    const allowedReasons = [
-        "spam",
-        "harassment",
-        "personal_data",
-        "impersonation",
-        "other"
-    ];
+        <h2>
+          ${escapeHTML(
+            user.displayName ||
+            user.username
+          )}
+        </h2>
 
-    if (
-        !allowedReasons.includes(
-            reason
-        )
-    ) {
-        return false;
-    }
+        <p class="public-username">
+          @${escapeHTML(user.username)}
+        </p>
 
-    const reports =
-        getReports();
+        <p>
+          ${escapeHTML(
+            user.bio ||
+            "Нет описания."
+          )}
+        </p>
 
-    const duplicate =
-        reports.some(
-            report =>
-                report.reporterID ===
-                    user.id &&
-                report.targetType ===
-                    targetType &&
-                report.targetID ===
-                    targetID &&
-                report.status ===
-                    "OPEN"
-        );
+        ${
+          user.anonymousId
+            ? `
+              <div class="profile-id">
+                ${escapeHTML(
+                  user.anonymousId
+                )}
+              </div>
+            `
+            : ""
+        }
 
-    if (duplicate) {
-        showToast(
-            "Ты уже отправлял жалобу."
-        );
-        return false;
-    }
+        <div class="public-profile-actions">
+          ${
+            user.id !== state.user?.id
+              ? `
+                <button
+                  class="primary-button full-button"
+                  id="modalMessageUser"
+                  type="button"
+                >
+                  Написать сообщение
+                </button>
+              `
+              : ""
+          }
+        </div>
+      </div>
+    `;
 
-    reports.push({
-        id: generateReportID(),
-        reporterID: user.id,
-        targetType,
-        targetID,
-        reason,
-        status: "OPEN",
-        createdAt: Date.now()
-    });
+    $("#modalMessageUser")
+      ?.addEventListener(
+        "click",
+        () => {
+          closeModal("userProfileModal");
+          navigate("messages");
+          openChat(user.id);
+        }
+      );
 
-    saveReports(reports);
+    openModal("userProfileModal");
+  } catch (error) {
+    showToast(error.message);
+  }
+}
+
+/* =========================
+   PROFILE EDIT
+========================= */
+
+function openProfileEditor() {
+  if (!state.user) return;
+
+  $("#editUsernameInput").value =
+    state.user.username || "";
+
+  $("#editBioInput").value =
+    state.user.bio || "";
+
+  setMessage(
+    $("#profileEditMessage"),
+    ""
+  );
+
+  openModal("profileEditModal");
+}
+
+async function saveProfile(event) {
+  event.preventDefault();
+
+  const username =
+    $("#editUsernameInput")
+      ?.value.trim();
+
+  const bio =
+    $("#editBioInput")
+      ?.value.trim();
+
+  try {
+    const result =
+      await api("/users/me", {
+        method: "PATCH",
+        body: JSON.stringify({
+          username,
+          bio,
+          displayName: username
+        })
+      });
+
+    state.user = {
+      ...state.user,
+      ...result.user
+    };
+
+    closeModal(
+      "profileEditModal"
+    );
+
+    updateUserUI();
+    loadOwnProfile();
 
     showToast(
-        "Жалоба отправлена"
+      "Профиль сохранён.",
+      "success"
     );
-
-    return true;
+  } catch (error) {
+    setMessage(
+      $("#profileEditMessage"),
+      error.message
+    );
+  }
 }
 
-function reportPost(postID) {
-    const reason =
-        prompt(
-            "Причина жалобы:\nspam / harassment / personal_data / impersonation / other"
-        );
+/* =========================
+   MESSAGES
+========================= */
 
-    if (!reason) return;
+async function loadConversations() {
+  try {
+    const result =
+      await api("/messages");
 
-    createReport(
-        "POST",
-        postID,
-        reason.trim()
-    );
+    state.conversations =
+      result.conversations || [];
+
+    renderConversations();
+  } catch (error) {
+    showToast(error.message);
+  }
 }
 
-/* =========================================================
-   ACTIVITY LOG
-========================================================= */
+function renderConversations() {
+  const container =
+    $("#conversationItems");
 
-function getActivity() {
-    return readStorage(
-        STORAGE.ACTIVITY,
-        []
-    );
-}
+  if (!container) return;
 
-function saveActivity(activity) {
-    return writeStorage(
-        STORAGE.ACTIVITY,
-        activity
-    );
-}
+  if (!state.conversations.length) {
+    container.innerHTML = `
+      <div class="empty-state compact">
+        <div class="empty-icon">□</div>
+        <strong>Чатов пока нет</strong>
+        <p>Найди пользователя и начни разговор.</p>
+      </div>
+    `;
 
-function addActivity(
-    userID,
-    type,
-    data = {}
-) {
-    const activity =
-        getActivity();
+    return;
+  }
 
-    activity.unshift({
-        id: uuid(),
-        userID,
-        type,
-        data,
-        createdAt: Date.now()
+  container.innerHTML =
+    state.conversations.map(
+      conversation => {
+        const user =
+          conversation.user;
+
+        const last =
+          conversation.lastMessage;
+
+        return `
+          <button
+            class="conversation-item ${
+              state.currentChat === user.id
+                ? "active"
+                : ""
+            }"
+            data-conversation-user="${escapeHTML(user.id)}"
+            type="button"
+          >
+            <div class="avatar">
+              ${initials(user)}
+            </div>
+
+            <div class="conversation-info">
+              <strong>
+                ${escapeHTML(
+                  user.displayName ||
+                  user.username
+                )}
+              </strong>
+
+              <span>
+                ${
+                  last
+                    ? escapeHTML(
+                        last.text
+                      )
+                    : "Новый разговор"
+                }
+              </span>
+            </div>
+
+            ${
+              last
+                ? `
+                  <time>
+                    ${escapeHTML(
+                      formatDate(
+                        last.createdAt
+                      )
+                    )}
+                  </time>
+                `
+                : ""
+            }
+          </button>
+        `;
+      }
+    ).join("");
+
+  $$("[data-conversation-user]")
+    .forEach(button => {
+      button.addEventListener(
+        "click",
+        () => openChat(
+          button.dataset.conversationUser
+        )
+      );
     });
-
-    /*
-        Ограничиваем локальный журнал,
-        чтобы прототип не разрастался
-        бесконечно.
-    */
-
-    if (activity.length > 5000) {
-        activity.length = 5000;
-    }
-
-    saveActivity(activity);
 }
 
-/* =========================================================
-   ROOMS
-========================================================= */
+async function openChat(userId) {
+  try {
+    const result =
+      await api(
+        `/messages/${userId}`
+      );
 
-function getRooms() {
-    return readStorage(
-        STORAGE.ROOMS,
-        []
+    state.currentChat =
+      userId;
+
+    const placeholder =
+      $("#chatPlaceholder");
+
+    const content =
+      $("#chatContent");
+
+    placeholder?.classList.add(
+      "hidden"
     );
-}
 
-function saveRooms(rooms) {
-    return writeStorage(
-        STORAGE.ROOMS,
-        rooms
+    content?.classList.remove(
+      "hidden"
     );
-}
 
-function getUserRoom(userID) {
     const user =
-        getUserByID(userID);
+      result.user;
 
-    if (!user) return null;
+    $("#chatUsername").textContent =
+      user.displayName ||
+      user.username;
 
-    if (!user.room) {
-        user.room = {
-            name: "Моя комната",
-            description: "",
-            wallpaper: "default",
-            items: [],
-            visitors: []
-        };
+    $("#chatUserID").textContent =
+      `@${user.username}`;
 
-        const users =
-            getUsers();
+    $("#chatAvatar").textContent =
+      initials(user);
 
-        const stored =
-            users.find(
-                item => item.id === userID
-            );
+    renderMessages(
+      result.messages || []
+    );
 
-        if (stored) {
-            stored.room =
-                user.room;
-
-            saveUsers(users);
-        }
-    }
-
-    return user.room;
+    renderConversations();
+  } catch (error) {
+    showToast(error.message);
+  }
 }
 
-function visitRoom(userID) {
-    const current =
-        getCurrentUser();
+function renderMessages(list) {
+  const container =
+    $("#chatMessages");
 
-    const target =
-        getUserByID(userID);
+  if (!container) return;
 
-    if (!current || !target) {
-        return;
+  if (!list.length) {
+    container.innerHTML = `
+      <div class="empty-state compact">
+        <div class="empty-icon">✦</div>
+        <strong>Начни разговор</strong>
+        <p>Здесь пока нет сообщений.</p>
+      </div>
+    `;
+
+    return;
+  }
+
+  container.innerHTML =
+    list.map(message => {
+      const own =
+        message.from === state.user?.id;
+
+      return `
+        <div class="message-row ${
+          own ? "own" : "other"
+        }">
+          <div class="message-bubble">
+            <div class="message-text">
+              ${escapeHTML(
+                message.text
+              ).replaceAll(
+                "\n",
+                "<br>"
+              )}
+            </div>
+
+            <time>
+              ${escapeHTML(
+                formatDate(
+                  message.createdAt
+                )
+              )}
+            </time>
+          </div>
+        </div>
+      `;
+    }).join("");
+
+  container.scrollTop =
+    container.scrollHeight;
+}
+
+async function sendMessage(event) {
+  event.preventDefault();
+
+  if (!state.currentChat) {
+    showToast(
+      "Сначала выбери пользователя."
+    );
+    return;
+  }
+
+  const input =
+    $("#chatInput");
+
+  const text =
+    input?.value.trim() || "";
+
+  if (!text) return;
+
+  input.value = "";
+
+  try {
+    const result =
+      await api(
+        `/messages/${state.currentChat}`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            text
+          })
+        }
+      );
+
+    const currentMessages =
+      $("#chatMessages");
+
+    if (currentMessages) {
+      const bubble =
+        document.createElement("div");
+
+      bubble.className =
+        "message-row own";
+
+      bubble.innerHTML = `
+        <div class="message-bubble">
+          <div class="message-text">
+            ${escapeHTML(text)}
+          </div>
+          <time>только что</time>
+        </div>
+      `;
+
+      currentMessages.appendChild(
+        bubble
+      );
+
+      currentMessages.scrollTop =
+        currentMessages.scrollHeight;
     }
+
+    await loadConversations();
+
+    if (result.message) {
+      // сервер подтвердил сообщение
+    }
+  } catch (error) {
+    input.value = text;
+    showToast(error.message);
+  }
+}
+
+/* =========================
+   ROOM
+========================= */
+
+async function loadRoom() {
+  try {
+    const result =
+      await api("/room");
 
     const room =
-        getUserRoom(
-            target.id
-        );
+      result.room;
 
-    if (!room) return;
+    $("#roomStatusTitle").textContent =
+      room.visits
+        ? "Твоя комната открыта"
+        : "Твоя комната закрыта";
 
-    if (!Array.isArray(room.visitors)) {
-        room.visitors = [];
+    $("#roomStatusText").textContent =
+      room.description ||
+      "У комнаты пока нет описания.";
+
+    $("#roomVisitsToggle").checked =
+      Boolean(room.visits);
+
+    const preview =
+      $("#roomPreview");
+
+    if (preview) {
+      preview.dataset.style =
+        room.style || "mint";
     }
-
-    if (
-        !room.visitors.includes(
-            current.id
-        )
-    ) {
-        room.visitors.push(
-            current.id
-        );
-    }
-
-    const users =
-        getUsers();
-
-    const stored =
-        users.find(
-            user =>
-                user.id === target.id
-        );
-
-    if (stored) {
-        stored.room =
-            room;
-
-        saveUsers(users);
-    }
-
-    showToast(
-        `🏠 Ты зашёл в комнату ${target.username}`
-    );
+  } catch (error) {
+    showToast(error.message);
+  }
 }
 
-/* =========================================================
-   ROOM ITEMS
-========================================================= */
+function openRoomEditor() {
+  loadRoom();
 
-function addRoomItem(
-    userID,
-    item
-) {
-    const user =
-        getCurrentUser();
+  api("/room")
+    .then(result => {
+      const room =
+        result.room;
 
-    if (!user) return false;
+      $("#roomNameInput").value =
+        room.name || "";
 
-    if (
-        user.id !== userID &&
-        user.role !== NOBODY.ownerRole
-    ) {
-        return false;
-    }
+      $("#roomDescriptionInput").value =
+        room.description || "";
 
-    const users =
-        getUsers();
+      $("#roomStyleSelect").value =
+        room.style || "mint";
 
-    const target =
-        users.find(
-            itemUser =>
-                itemUser.id === userID
-        );
+      openModal("roomEditModal");
+    })
+    .catch(error => {
+      showToast(error.message);
+    });
+}
 
-    if (!target) return false;
+async function saveRoom(event) {
+  event.preventDefault();
 
-    if (!target.room) {
-        target.room = {
-            name: "Моя комната",
-            description: "",
-            wallpaper: "default",
-            items: [],
-            visitors: []
-        };
-    }
+  const name =
+    $("#roomNameInput")
+      ?.value.trim();
 
-    if (
-        !Array.isArray(
-            target.room.items
-        )
-    ) {
-        target.room.items = [];
-    }
+  const description =
+    $("#roomDescriptionInput")
+      ?.value.trim();
 
-    if (
-        target.room.items.length >=
-        NOBODY.maxRoomItems
-    ) {
-        return false;
-    }
+  const style =
+    $("#roomStyleSelect")
+      ?.value;
 
-    target.room.items.push({
-        id: uuid(),
-        type: item.type || "decoration",
-        x: Number(item.x || 0),
-        y: Number(item.y || 0),
-        rotation:
-            Number(item.rotation || 0),
-        data:
-            item.data || {}
+  const visits =
+    $("#roomVisitsToggle")
+      ?.checked ?? true;
+
+  try {
+    await api("/room", {
+      method: "PATCH",
+      body: JSON.stringify({
+        name,
+        description,
+        style,
+        visits
+      })
     });
 
-    saveUsers(users);
-
-    return true;
-}
-
-/* =========================================================
-   MINI GAMES
-========================================================= */
-
-function getGames() {
-    return readStorage(
-        STORAGE.GAMES,
-        []
-    );
-}
-
-function saveGames(games) {
-    return writeStorage(
-        STORAGE.GAMES,
-        games
-    );
-}
-
-/* =========================================================
-   TIC TAC TOE
-========================================================= */
-
-function createTicTacToe(
-    playerOne,
-    playerTwo
-) {
-    const games =
-        getGames();
-
-    const game = {
-        id: uuid(),
-        type: "TICTACTOE",
-        players: [
-            playerOne,
-            playerTwo
-        ],
-        board: [
-            "",
-            "",
-            "",
-            "",
-            "",
-            "",
-            "",
-            "",
-            ""
-        ],
-        turn: playerOne,
-        winner: null,
-        status: "ACTIVE",
-        createdAt: Date.now()
-    };
-
-    games.push(game);
-
-    saveGames(games);
-
-    return game;
-}
-
-function ticTacToeWinner(
-    board
-) {
-    const lines = [
-        [0, 1, 2],
-        [3, 4, 5],
-        [6, 7, 8],
-        [0, 3, 6],
-        [1, 4, 7],
-        [2, 5, 8],
-        [0, 4, 8],
-        [2, 4, 6]
-    ];
-
-    for (
-        const [
-            a,
-            b,
-            c
-        ] of lines
-    ) {
-        if (
-            board[a] &&
-            board[a] === board[b] &&
-            board[a] === board[c]
-        ) {
-            return board[a];
-        }
-    }
-
-    if (
-        board.every(
-            cell => cell !== ""
-        )
-    ) {
-        return "DRAW";
-    }
-
-    return null;
-}
-
-function ticTacToeMove(
-    gameID,
-    index,
-    playerID
-) {
-    const games =
-        getGames();
-
-    const game =
-        games.find(
-            item =>
-                item.id === gameID
-        );
-
-    if (!game) return false;
-
-    if (
-        game.status !== "ACTIVE"
-    ) {
-        return false;
-    }
-
-    if (
-        game.turn !== playerID
-    ) {
-        return false;
-    }
-
-    if (
-        index < 0 ||
-        index > 8 ||
-        game.board[index]
-    ) {
-        return false;
-    }
-
-    const symbol =
-        game.players[0] === playerID
-            ? "X"
-            : "O";
-
-    game.board[index] =
-        symbol;
-
-    const result =
-        ticTacToeWinner(
-            game.board
-        );
-
-    if (result) {
-        game.winner =
-            result === "DRAW"
-                ? "DRAW"
-                : (
-                    result === "X"
-                        ? game.players[0]
-                        : game.players[1]
-                );
-
-        game.status = "FINISHED";
-    } else {
-        game.turn =
-            game.players.find(
-                id => id !== playerID
-            );
-    }
-
-    saveGames(games);
-
-    return true;
-}
-
-/* =========================================================
-   BATTLESHIP FOUNDATION
-========================================================= */
-
-function createBattleshipGame(
-    playerOne,
-    playerTwo
-) {
-    const games =
-        getGames();
-
-    const game = {
-        id: uuid(),
-        type: "BATTLESHIP",
-        players: [
-            playerOne,
-            playerTwo
-        ],
-        boards: {
-            [playerOne]: [],
-            [playerTwo]: []
-        },
-        shots: {
-            [playerOne]: [],
-            [playerTwo]: []
-        },
-        turn: playerOne,
-        status: "SETUP",
-        winner: null,
-        createdAt: Date.now()
-    };
-
-    games.push(game);
-
-    saveGames(games);
-
-    return game;
-}
-
-/* =========================================================
-   OWNER
-========================================================= */
-
-function isOwner(user) {
-    return Boolean(
-        user &&
-        user.role ===
-            NOBODY.ownerRole
-    );
-}
-
-function renderOwnerPanel() {
-    const current =
-        getCurrentUser();
-
-    if (!isOwner(current)) {
-        showPage("home");
-        return;
-    }
-
-    const users =
-        getUsers();
-
-    const posts =
-        getPosts();
-
-    const reports =
-        getReports();
-
-    const messages =
-        getMessages();
-
-    const comments =
-        posts.reduce(
-            (
-                total,
-                post
-            ) =>
-                total +
-                (
-                    Array.isArray(
-                        post.comments
-                    )
-                        ? post.comments.length
-                        : 0
-                ),
-            0
-        );
-
-    const ownerStats =
-        document.getElementById(
-            "ownerStats"
-        );
-
-    if (!ownerStats) return;
-
-    ownerStats.innerHTML = `
-        <div class="owner-stat">
-            <div class="owner-stat-number">
-                ${users.length}
-            </div>
-            <div class="owner-stat-label">
-                Пользователей
-            </div>
-        </div>
-
-        <div class="owner-stat">
-            <div class="owner-stat-number">
-                ${posts.length}
-            </div>
-            <div class="owner-stat-label">
-                Постов
-            </div>
-        </div>
-
-        <div class="owner-stat">
-            <div class="owner-stat-number">
-                ${comments}
-            </div>
-            <div class="owner-stat-label">
-                Комментариев
-            </div>
-        </div>
-
-        <div class="owner-stat">
-            <div class="owner-stat-number">
-                ${messages.length}
-            </div>
-            <div class="owner-stat-label">
-                Сообщений
-            </div>
-        </div>
-
-        <div class="owner-stat">
-            <div class="owner-stat-number">
-                ${
-                    reports.filter(
-                        report =>
-                            report.status ===
-                            "OPEN"
-                    ).length
-                }
-            </div>
-            <div class="owner-stat-label">
-                Открытых жалоб
-            </div>
-        </div>
-
-        <div class="owner-stat">
-            <div class="owner-stat-number">
-                ${
-                    users.filter(
-                        user =>
-                            user.online
-                    ).length
-                }
-            </div>
-            <div class="owner-stat-label">
-                Сейчас онлайн
-            </div>
-        </div>
-    `;
-}
-
-/* =========================================================
-   OWNER USER ACTIONS
-========================================================= */
-
-function ownerDeleteUser(
-    userID
-) {
-    const owner =
-        getCurrentUser();
-
-    if (!isOwner(owner)) {
-        return false;
-    }
-
-    if (
-        owner.id === userID
-    ) {
-        return false;
-    }
-
-    const users =
-        getUsers();
-
-    const index =
-        users.findIndex(
-            user =>
-                user.id === userID
-        );
-
-    if (index === -1) {
-        return false;
-    }
-
-    users.splice(
-        index,
-        1
-    );
-
-    saveUsers(users);
-
-    const posts =
-        getPosts()
-            .filter(
-                post =>
-                    post.userId !==
-                    userID
-            );
-
-    savePosts(posts);
-
-    const blocks =
-        getBlocks();
-
-    delete blocks[userID];
-
-    Object.keys(blocks)
-        .forEach(
-            key => {
-                blocks[key] =
-                    blocks[key].filter(
-                        id =>
-                            id !== userID
-                    );
-            }
-        );
-
-    saveBlocks(blocks);
-
-    renderOwnerPanel();
+    closeModal("roomEditModal");
+    loadRoom();
 
     showToast(
-        "Аккаунт удалён"
+      "Комната сохранена.",
+      "success"
     );
-
-    return true;
+  } catch (error) {
+    showToast(error.message);
+  }
 }
 
-function ownerDeletePost(
-    postID
-) {
-    const owner =
-        getCurrentUser();
+async function saveRoomVisits() {
+  const visits =
+    $("#roomVisitsToggle")
+      ?.checked ?? true;
 
-    if (!isOwner(owner)) {
-        return false;
-    }
+  try {
+    await api("/room", {
+      method: "PATCH",
+      body: JSON.stringify({
+        visits
+      })
+    });
 
-    return deletePost(
-        postID
-    );
+    loadRoom();
+  } catch (error) {
+    showToast(error.message);
+  }
 }
 
-function ownerResolveReport(
-    reportID,
-    status = "RESOLVED"
-) {
-    const owner =
-        getCurrentUser();
+/* =========================
+   PRIVACY
+========================= */
 
-    if (!isOwner(owner)) {
-        return false;
-    }
+async function loadPrivacy() {
+  try {
+    const result =
+      await api("/users/me");
 
-    const reports =
-        getReports();
+    const privacy =
+      result.user.privacy;
 
-    const report =
-        reports.find(
-            item =>
-                item.id === reportID
-        );
+    if (!privacy) return;
 
-    if (!report) {
-        return false;
-    }
+    $("#showIDToggle").checked =
+      privacy.showID;
 
-    report.status =
-        status;
+    $("#allowMessagesToggle").checked =
+      privacy.allowMessages;
 
-    report.resolvedAt =
-        Date.now();
-
-    report.resolvedBy =
-        owner.id;
-
-    saveReports(reports);
-
-    renderOwnerPanel();
-
-    return true;
+    $("#showRoomToggle").checked =
+      privacy.showRoom;
+  } catch (error) {
+    showToast(error.message);
+  }
 }
 
-/* =========================================================
-   TOAST
-========================================================= */
+async function savePrivacy() {
+  try {
+    await api(
+      "/users/me/privacy",
+      {
+        method: "PATCH",
+        body: JSON.stringify({
+          showID:
+            $("#showIDToggle").checked,
 
-let toastTimer = null;
+          allowMessages:
+            $("#allowMessagesToggle").checked,
 
-function showToast(text) {
-    const toast =
-        document.getElementById(
-            "toast"
-        );
-
-    if (!toast) return;
-
-    toast.textContent =
-        text;
-
-    toast.classList.add(
-        "show"
+          showRoom:
+            $("#showRoomToggle").checked
+        })
+      }
     );
 
-    clearTimeout(
-        toastTimer
-    );
+    closeModal("privacyModal");
 
-    toastTimer =
-        setTimeout(
-            () => {
-                toast.classList.remove(
-                    "show"
-                );
-            },
-            2200
-        );
+    showToast(
+      "Настройки приватности сохранены.",
+      "success"
+    );
+  } catch (error) {
+    showToast(error.message);
+  }
 }
 
-/* =========================================================
-   APPLICATION RENDER
-========================================================= */
+/* =========================
+   OWNER
+========================= */
 
-function renderApplication() {
-    const user =
-        getCurrentUser();
+async function loadOwner() {
+  try {
+    const result =
+      await api("/owner/stats");
 
-    const authScreen =
-        document.getElementById(
-            "authScreen"
-        );
+    const stats =
+      result.stats;
 
-    const bottomNavigation =
-        document.getElementById(
-            "bottomNav"
-        );
+    const container =
+      $("#ownerStats");
 
-    if (!user) {
-        authScreen?.classList.remove(
-            "hidden"
-        );
+    if (!container) return;
 
-        bottomNavigation?.classList.add(
-            "hidden"
-        );
+    container.innerHTML = `
+      <div class="owner-stat">
+        <span>Users</span>
+        <strong>${stats.users}</strong>
+      </div>
 
-        pages.forEach(
-            page => {
-                const element =
-                    document.getElementById(
-                        `${page}Page`
-                    );
+      <div class="owner-stat">
+        <span>Posts</span>
+        <strong>${stats.posts}</strong>
+      </div>
 
-                if (element) {
-                    element.classList.add(
-                        "hidden"
-                    );
-                }
-            }
-        );
+      <div class="owner-stat">
+        <span>Chats</span>
+        <strong>${stats.conversations}</strong>
+      </div>
 
-        return;
-    }
-
-    authScreen?.classList.add(
-        "hidden"
+      <div class="owner-stat">
+        <span>Sessions</span>
+        <strong>${stats.sessions}</strong>
+      </div>
+    `;
+  } catch (error) {
+    showToast(
+      "Owner Panel недоступна."
     );
-
-    bottomNavigation?.classList.remove(
-        "hidden"
-    );
-
-    const welcomeText =
-        document.getElementById(
-            "welcomeText"
-        );
-
-    if (welcomeText) {
-        welcomeText.textContent =
-            `Привет, ${
-                user.username ||
-                "Nobody"
-            }.`;
-    }
-
-    const profileButton =
-        document.getElementById(
-            "headerProfileButton"
-        );
-
-    if (profileButton) {
-        profileButton.textContent =
-            getInitial(
-                user.username
-            );
-    }
-
-    showPage("home");
+  }
 }
 
-/* =========================================================
-   ONLINE STATUS
-========================================================= */
+/* =========================
+   GAMES
+========================= */
 
-function updateOnlineStatus() {
-    const user =
-        getCurrentUser();
+function openGame(game) {
+  const title =
+    $("#gameModalTitle");
 
-    if (!user) return;
+  const container =
+    $("#gameContainer");
 
-    const users =
-        getUsers();
+  if (!title || !container) {
+    return;
+  }
 
-    const stored =
-        users.find(
-            item =>
-                item.id === user.id
-        );
+  openModal("gameModal");
 
-    if (!stored) return;
+  if (game === "tic-tac-toe") {
+    title.textContent =
+      "Крестики-нолики";
 
-    stored.online =
-        document.visibilityState ===
-        "visible";
+    startTicTacToe(container);
+    return;
+  }
 
-    stored.lastSeen =
-        Date.now();
+  if (game === "number") {
+    title.textContent =
+      "Угадай число";
 
-    saveUsers(users);
+    startNumberGame(container);
+    return;
+  }
+
+  if (game === "reaction") {
+    title.textContent =
+      "Reaction";
+
+    startReactionGame(container);
+    return;
+  }
+
+  if (game === "battleship") {
+    title.textContent =
+      "Морской бой";
+
+    startBattleship(container);
+  }
 }
 
-document.addEventListener(
-    "visibilitychange",
-    updateOnlineStatus
-);
+function startTicTacToe(container) {
+  let board = Array(9).fill("");
+  let player = "X";
+  let gameOver = false;
 
-window.addEventListener(
-    "beforeunload",
-    () => {
-        const user =
-            getCurrentUser();
+  function render() {
+    container.innerHTML = `
+      <div class="mini-game">
+        <div class="game-status">
+          Ход: ${player}
+        </div>
 
-        if (!user) return;
+        <div class="ttt-board">
+          ${board.map(
+            (cell, index) => `
+              <button
+                class="ttt-cell"
+                data-cell="${index}"
+                type="button"
+              >
+                ${cell}
+              </button>
+            `
+          ).join("")}
+        </div>
 
-        const users =
-            getUsers();
+        <button
+          class="secondary-button"
+          id="resetTTT"
+          type="button"
+        >
+          Новая игра
+        </button>
+      </div>
+    `;
 
-        const stored =
-            users.find(
-                item =>
-                    item.id === user.id
-            );
+    $$("[data-cell]")
+      .forEach(button => {
+        button.addEventListener(
+          "click",
+          () => move(
+            Number(button.dataset.cell)
+          )
+        );
+      });
 
-        if (stored) {
-            stored.online = false;
-            stored.lastSeen =
-                Date.now();
-
-            saveUsers(users);
+    $("#resetTTT")
+      ?.addEventListener(
+        "click",
+        () => {
+          board = Array(9).fill("");
+          player = "X";
+          gameOver = false;
+          render();
         }
+      );
+  }
+
+  function move(index) {
+    if (
+      gameOver ||
+      board[index]
+    ) {
+      return;
     }
-);
 
-/* =========================================================
-   ESC KEY
-========================================================= */
+    board[index] = player;
 
-document.addEventListener(
-    "keydown",
-    event => {
+    const winner =
+      getWinner(board);
+
+    if (winner) {
+      gameOver = true;
+      render();
+
+      setTimeout(
+        () => showToast(
+          `Победил ${winner}!`,
+          "success"
+        ),
+        50
+      );
+
+      return;
+    }
+
+    if (
+      board.every(Boolean)
+    ) {
+      gameOver = true;
+      render();
+
+      setTimeout(
+        () => showToast("Ничья!"),
+        50
+      );
+
+      return;
+    }
+
+    player =
+      player === "X"
+        ? "O"
+        : "X";
+
+    render();
+  }
+
+  render();
+}
+
+function getWinner(board) {
+  const lines = [
+    [0, 1, 2],
+    [3, 4, 5],
+    [6, 7, 8],
+    [0, 3, 6],
+    [1, 4, 7],
+    [2, 5, 8],
+    [0, 4, 8],
+    [2, 4, 6]
+  ];
+
+  for (const line of lines) {
+    const [a, b, c] = line;
+
+    if (
+      board[a] &&
+      board[a] === board[b] &&
+      board[a] === board[c]
+    ) {
+      return board[a];
+    }
+  }
+
+  return null;
+}
+
+function startNumberGame(container) {
+  let target =
+    Math.floor(
+      Math.random() * 100
+    ) + 1;
+
+  let attempts = 0;
+
+  container.innerHTML = `
+    <div class="mini-game">
+      <p>
+        Я загадал число от 1 до 100.
+      </p>
+
+      <input
+        class="input"
+        id="numberGuess"
+        type="number"
+        min="1"
+        max="100"
+        placeholder="Твоё число"
+      >
+
+      <button
+        class="primary-button full-button"
+        id="guessButton"
+        type="button"
+      >
+        Проверить
+      </button>
+
+      <p
+        class="game-feedback"
+        id="numberFeedback"
+      ></p>
+    </div>
+  `;
+
+  $("#guessButton")
+    ?.addEventListener(
+      "click",
+      () => {
+        const value =
+          Number(
+            $("#numberGuess").value
+          );
+
         if (
-            event.key !== "Escape"
+          value < 1 ||
+          value > 100
         ) {
-            return;
+          return;
         }
 
-        document
-            .querySelectorAll(
-                ".modal"
-            )
-            .forEach(
-                modal => {
-                    modal.classList.add(
-                        "hidden"
-                    );
-                }
-            );
+        attempts++;
+
+        const feedback =
+          $("#numberFeedback");
+
+        if (value === target) {
+          feedback.textContent =
+            `Правильно! Попыток: ${attempts}.`;
+
+          return;
+        }
+
+        feedback.textContent =
+          value < target
+            ? "Больше ↑"
+            : "Меньше ↓";
+      }
+    );
+}
+
+function startReactionGame(container) {
+  let active = false;
+  let startTime = 0;
+  let timeout = null;
+
+  container.innerHTML = `
+    <div class="mini-game reaction-game">
+      <button
+        class="reaction-button"
+        id="reactionButton"
+        type="button"
+      >
+        Жди...
+      </button>
+
+      <p id="reactionResult">
+        Нажми и жди сигнала.
+      </p>
+    </div>
+  `;
+
+  const button =
+    $("#reactionButton");
+
+  function prepare() {
+    active = false;
+    button.textContent =
+      "Жди...";
+    button.disabled = false;
+
+    timeout =
+      setTimeout(() => {
+        active = true;
+        startTime =
+          performance.now();
+
+        button.textContent =
+          "ЖМИ!";
+      },
+      1200 +
+      Math.random() * 2800
+      );
+  }
+
+  button.addEventListener(
+    "click",
+    () => {
+      if (!active) {
+        if (timeout) {
+          clearTimeout(timeout);
+        }
+
+        $("#reactionResult").textContent =
+          "Слишком рано! Попробуй ещё.";
+
+        prepare();
+        return;
+      }
+
+      const time =
+        Math.round(
+          performance.now() -
+          startTime
+        );
+
+      active = false;
+
+      $("#reactionResult").textContent =
+        `Твоя реакция: ${time} мс`;
+
+      button.textContent =
+        "Ещё раз";
+
+      button.onclick = () => {
+        button.onclick = null;
+        prepare();
+      };
     }
-);
+  );
 
-/* =========================================================
-   CLICK OUTSIDE MODALS
-========================================================= */
+  prepare();
+}
 
-document.addEventListener(
+function startBattleship(container) {
+  container.innerHTML = `
+    <div class="mini-game">
+      <div class="game-placeholder">
+        <div class="empty-icon">▦</div>
+        <strong>Морской бой</strong>
+        <p>
+          Игровое поле будет подключено
+          к онлайн-мультиплееру следующим этапом.
+        </p>
+      </div>
+    </div>
+  `;
+}
+
+/* =========================
+   MODALS
+========================= */
+
+function bindModalButtons() {
+  $$("[data-close-modal]")
+    .forEach(button => {
+      button.addEventListener(
+        "click",
+        () => closeModal(
+          button.dataset.closeModal
+        )
+      );
+    });
+}
+
+/* =========================
+   SETTINGS
+========================= */
+
+function setupSettings() {
+  $("#themeSelect")
+    ?.addEventListener(
+      "change",
+      event => {
+        applyTheme(
+          event.target.value
+        );
+      }
+    );
+
+  $("#themeButton")
+    ?.addEventListener(
+      "click",
+      toggleTheme
+    );
+
+  $("#rulesButton")
+    ?.addEventListener(
+      "click",
+      () => openModal(
+        "rulesModal"
+      )
+    );
+
+  $("#openRulesFromAuth")
+    ?.addEventListener(
+      "click",
+      () => openModal(
+        "rulesModal"
+      )
+    );
+
+  $("#safetyButton")
+    ?.addEventListener(
+      "click",
+      () => openModal(
+        "safetyModal"
+      )
+    );
+
+  $("#privacyButton")
+    ?.addEventListener(
+      "click",
+      async () => {
+        await loadPrivacy();
+        openModal("privacyModal");
+      }
+    );
+
+  $("#savePrivacyButton")
+    ?.addEventListener(
+      "click",
+      savePrivacy
+    );
+
+  $("#editProfileButton")
+    ?.addEventListener(
+      "click",
+      openProfileEditor
+    );
+
+  $("#logoutButton")
+    ?.addEventListener(
+      "click",
+      logout
+    );
+}
+
+/* =========================
+   EVENTS
+========================= */
+
+function setupNavigation() {
+  $$("[data-page]")
+    .forEach(button => {
+      button.addEventListener(
+        "click",
+        () => {
+          const page =
+            button.dataset.page;
+
+          if (
+            page &&
+            page !== "owner"
+          ) {
+            navigate(page);
+          }
+
+          if (
+            page === "owner"
+          ) {
+            navigate("owner");
+          }
+        }
+      );
+    });
+
+  $$("[data-action='create']")
+    .forEach(button => {
+      button.addEventListener(
+        "click",
+        () => {
+          openModal("postModal");
+        }
+      );
+    });
+
+  $("#moreNavButton")
+    ?.addEventListener(
+      "click",
+      event => {
+        event.stopPropagation();
+
+        $("#moreMenu")
+          ?.classList.toggle(
+            "hidden"
+          );
+      }
+    );
+
+  document.addEventListener(
     "click",
     event => {
-        if (
-            !event.target.classList.contains(
-                "modal"
-            )
-        ) {
-            return;
-        }
+      const menu =
+        $("#moreMenu");
 
-        event.target.classList.add(
-            "hidden"
+      const button =
+        $("#moreNavButton");
+
+      if (
+        menu &&
+        button &&
+        !menu.contains(event.target) &&
+        !button.contains(event.target)
+      ) {
+        menu.classList.add(
+          "hidden"
         );
+      }
     }
-);
-
-/* =========================================================
-   DEFAULT DATA
-========================================================= */
-
-function initializeDatabase() {
-    if (
-        !storageExists(
-            STORAGE.USERS
-        )
-    ) {
-        saveUsers([]);
-    }
-
-    if (
-        !storageExists(
-            STORAGE.POSTS
-        )
-    ) {
-        savePosts([]);
-    }
-
-    if (
-        !storageExists(
-            STORAGE.MESSAGES
-        )
-    ) {
-        saveMessages([]);
-    }
-
-    if (
-        !storageExists(
-            STORAGE.ROOMS
-        )
-    ) {
-        saveRooms([]);
-    }
-
-    if (
-        !storageExists(
-            STORAGE.GAMES
-        )
-    ) {
-        saveGames([]);
-    }
-
-    if (
-        !storageExists(
-            STORAGE.NOTIFICATIONS
-        )
-    ) {
-        saveNotifications([]);
-    }
-
-    if (
-        !storageExists(
-            STORAGE.REPORTS
-        )
-    ) {
-        saveReports([]);
-    }
-
-    if (
-        !storageExists(
-            STORAGE.BLOCKS
-        )
-    ) {
-        saveBlocks({});
-    }
-
-    if (
-        !storageExists(
-            STORAGE.ACTIVITY
-        )
-    ) {
-        saveActivity([]);
-    }
+  );
 }
 
-/* =========================================================
-   DATA MIGRATION
-========================================================= */
-
-function migrateUsers() {
-    const users =
-        getUsers();
-
-    let changed = false;
-
-    users.forEach(
-        user => {
-            if (
-                !Array.isArray(
-                    user.followers
-                )
-            ) {
-                user.followers = [];
-                changed = true;
-            }
-
-            if (
-                !Array.isArray(
-                    user.following
-                )
-            ) {
-                user.following = [];
-                changed = true;
-            }
-
-            if (
-                !Array.isArray(
-                    user.blocked
-                )
-            ) {
-                user.blocked = [];
-                changed = true;
-            }
-
-            if (
-                !user.settings
-            ) {
-                user.settings = {
-                    profileVisible: true,
-                    allowMessages: true,
-                    allowComments: true,
-                    notifications: true
-                };
-
-                changed = true;
-            }
-
-            if (
-                !user.room
-            ) {
-                user.room = {
-                    name: "Моя комната",
-                    description: "",
-                    wallpaper: "default",
-                    items: [],
-                    visitors: []
-                };
-
-                changed = true;
-            }
-
-            if (
-                !user.role
-            ) {
-                user.role = "USER";
-                changed = true;
-            }
-
-            if (
-                typeof user.postsCount !==
-                "number"
-            ) {
-                user.postsCount = 0;
-                changed = true;
-            }
-        }
+function setupAuth() {
+  $("#openLoginButton")
+    ?.addEventListener(
+      "click",
+      () => {
+        openAuth();
+        showLoginForm();
+      }
     );
 
-    if (changed) {
-        saveUsers(users);
-    }
-}
-
-function migratePosts() {
-    const posts =
-        getPosts();
-
-    let changed = false;
-
-    posts.forEach(
-        post => {
-            if (
-                !Array.isArray(
-                    post.likes
-                )
-            ) {
-                post.likes = [];
-                changed = true;
-            }
-
-            if (
-                !Array.isArray(
-                    post.dislikes
-                )
-            ) {
-                post.dislikes = [];
-                changed = true;
-            }
-
-            if (
-                !Array.isArray(
-                    post.comments
-                )
-            ) {
-                post.comments = [];
-                changed = true;
-            }
-
-            if (
-                !Array.isArray(
-                    post.media
-                )
-            ) {
-                post.media = [];
-                changed = true;
-            }
-        }
+  $("#openRegisterButton")
+    ?.addEventListener(
+      "click",
+      () => {
+        openAuth();
+        showRegisterForm();
+      }
     );
 
-    if (changed) {
-        savePosts(posts);
-    }
+  $("#authBackButton")
+    ?.addEventListener(
+      "click",
+      () => {
+        showScreen("authScreen");
+      }
+    );
+
+  $("#loginTab")
+    ?.addEventListener(
+      "click",
+      showLoginForm
+    );
+
+  $("#registerTab")
+    ?.addEventListener(
+      "click",
+      showRegisterForm
+    );
+
+  $("#authForm")
+    ?.addEventListener(
+      "submit",
+      submitAuth
+    );
 }
 
-/* =========================================================
-   DEBUG API
-========================================================= */
+function setupFeed() {
+  $("#createPostButton")
+    ?.addEventListener(
+      "click",
+      () => openModal(
+        "postModal"
+      )
+    );
 
-window.NOBODY = {
-    version: NOBODY.version,
+  $("#postForm")
+    ?.addEventListener(
+      "submit",
+      createPost
+    );
 
-    getCurrentUser,
-    getUsers,
-    getPosts,
-    getMessages,
-    getNotifications,
-    getReports,
+  $("#postText")
+    ?.addEventListener(
+      "input",
+      updatePostCounter
+    );
 
-    createPost,
-    deletePost,
-    editPost,
+  $("#addEmojiButton")
+    ?.addEventListener(
+      "click",
+      () => {
+        const textarea =
+          $("#postText");
 
-    sendMessage,
-    deleteMessage,
+        if (!textarea) return;
 
-    toggleFollow,
-    toggleBlock,
+        const emojis = [
+          " ✦",
+          " ♡",
+          " ◌",
+          " ✨",
+          " :3"
+        ];
 
-    createTicTacToe,
-    ticTacToeMove,
+        const emoji =
+          emojis[
+            Math.floor(
+              Math.random() *
+              emojis.length
+            )
+          ];
 
-    createBattleshipGame,
+        textarea.value += emoji;
+        textarea.focus();
 
-    addRoomItem,
-    visitRoom,
+        updatePostCounter();
+      }
+    );
 
-    createReport,
+  $$(".filter-button")
+    .forEach(button => {
+      button.addEventListener(
+        "click",
+        () => {
+          $$(".filter-button")
+            .forEach(
+              item =>
+                item.classList.remove(
+                  "active"
+                )
+            );
 
-    ownerDeleteUser,
-    ownerDeletePost,
-    ownerResolveReport
-};
+          button.classList.add(
+            "active"
+          );
 
-/* =========================================================
-   INITIALIZATION
-========================================================= */
+          const filter =
+            button.dataset.feedFilter;
 
-initializeDatabase();
-migrateUsers();
-migratePosts();
-loadTheme();
-renderApplication();
+          if (filter === "popular") {
+            renderFeed(
+              [...state.posts].sort(
+                (a, b) =>
+                  (b.likes || 0) -
+                  (a.likes || 0)
+              )
+            );
 
-/* =========================================================
-   END OF NOBODY v0.1 CORE
-========================================================= */
+            return;
+          }
+
+          renderFeed();
+        }
+      );
+    });
+}
+
+function setupMessages() {
+  $("#chatForm")
+    ?.addEventListener(
+      "submit",
+      sendMessage
+    );
+
+  $("#chatBackButton")
+    ?.addEventListener(
+      "click",
+      () => {
+        $("#chatContent")
+          ?.classList.add(
+            "hidden"
+          );
+
+        $("#chatPlaceholder")
+          ?.classList.remove(
+            "hidden"
+          );
+
+        state.currentChat =
+          null;
+
+        renderConversations();
+      }
+    );
+
+  $("#newMessageButton")
+    ?.addEventListener(
+      "click",
+      () => {
+        navigate("explore");
+
+        showToast(
+          "Найди пользователя, чтобы начать чат."
+        );
+      }
+    );
+}
+
+function setupRoom() {
+  $("#editRoomButton")
+    ?.addEventListener(
+      "click",
+      openRoomEditor
+    );
+
+  $("#roomEditForm")
+    ?.addEventListener(
+      "submit",
+      saveRoom
+    );
+
+  $("#roomVisitsToggle")
+    ?.addEventListener(
+      "change",
+      saveRoomVisits
+    );
+}
+
+function setupGames() {
+  $$(".game-card")
+    .forEach(card => {
+      card.addEventListener(
+        "click",
+        () => openGame(
+          card.dataset.game
+        )
+      );
+    });
+}
+
+/* =========================
+   KEYBOARD
+========================= */
+
+function setupKeyboard() {
+  document.addEventListener(
+    "keydown",
+    event => {
+      if (
+        event.key === "Escape"
+      ) {
+        closeAllModals();
+
+        $("#moreMenu")
+          ?.classList.add(
+            "hidden"
+          );
+      }
+    }
+  );
+}
+
+/* =========================
+   LOADING
+========================= */
+
+function showLoading() {
+  $("#loadingScreen")
+    ?.classList.remove(
+      "hidden"
+    );
+}
+
+function hideLoading() {
+  $("#loadingScreen")
+    ?.classList.add(
+      "hidden"
+    );
+}
+
+/* =========================
+   START
+========================= */
+
+async function startApp() {
+  applyTheme(state.theme);
+
+  setupAuth();
+  setupNavigation();
+  setupFeed();
+  setupMessages();
+  setupRoom();
+  setupGames();
+  setupSearch();
+  setupSettings();
+  setupKeyboard();
+  bindModalButtons();
+
+  $("#profileEditForm")
+    ?.addEventListener(
+      "submit",
+      saveProfile
+    );
+
+  $("#headerProfileButton")
+    ?.addEventListener(
+      "click",
+      () => navigate("profile")
+    );
+
+  $("#brandButton")
+    ?.addEventListener(
+      "click",
+      () => {
+        if (state.user) {
+          navigate("home");
+        }
+      }
+    );
+
+  showLoading();
+
+  if (state.token) {
+    const authenticated =
+      await loadMe();
+
+    if (authenticated) {
+      enterApp();
+    } else {
+      leaveApp();
+    }
+  } else {
+    leaveApp();
+  }
+
+  setTimeout(
+    hideLoading,
+    350
+  );
+}
+
+if (
+  document.readyState === "loading"
+) {
+  document.addEventListener(
+    "DOMContentLoaded",
+    startApp
+  );
+} else {
+  startApp();
+}
