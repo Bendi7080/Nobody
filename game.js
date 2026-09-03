@@ -30,9 +30,9 @@ function now(){ return new Date().toISOString(); }
 function loadDB(){
   try {
     const raw = localStorage.getItem(DB_KEY);
-    if(raw) { const db=JSON.parse(raw); db.comments=Array.isArray(db.comments)?db.comments:[]; return db; }
+    if(raw) return JSON.parse(raw);
   } catch {}
-  return {users:[],posts:[],likes:[],comments:[],messages:[],rooms:[],privacy:{},sessions:[]};
+  return {users:[],posts:[],likes:[],messages:[],rooms:[],privacy:{},sessions:[]};
 }
 function saveDB(){ localStorage.setItem(DB_KEY, JSON.stringify(state.db)); }
 function escapeHTML(v){
@@ -57,7 +57,7 @@ function toast(message,type="normal"){
 }
 function message(el,text,type="error"){if(!el)return;el.textContent=text;el.dataset.type=type}
 function getUser(id){return state.db.users.find(u=>u.id===id)||null}
-function currentUser(){return getUser(state.userId)}
+function currentUser(){return normalizeOwnerRole(getUser(state.userId))}
 function sanitizeUsername(v){return v.toLowerCase().trim().replace(/\s+/g,"_").replace(/[^a-z0-9а-яё_.-]/gi,"").slice(0,24)}
 function anonymousId(user){return "N-" + user.id.replace(/\W/g,"").slice(-8).toUpperCase()}
 
@@ -73,11 +73,18 @@ function toggleTheme(){applyTheme(state.theme==="dark"?"light":state.theme==="li
 /* Screens */
 function hideScreens(){$$(".screen").forEach(x=>x.classList.add("hidden"))}
 function showScreen(id){hideScreens();$("#"+id)?.classList.remove("hidden")}
+function updateOwnerUI(){
+  const ownerButtons=$$('[data-page="owner"]');
+  ownerButtons.forEach(button=>button.classList.toggle("hidden",!isOwner()));
+  const ownerPage=$("#ownerPage");
+  if(ownerPage && !isOwner() && state.currentPage==="owner") navigate("home");
+}
+
 function enterApp(){
   state.user=currentUser();
   if(!state.user){logout(false);return}
   $("#topbar")?.classList.remove("hidden");$("#bottomNav")?.classList.remove("hidden");$("#headerProfileButton")?.classList.remove("hidden");
-  updateUserUI();navigate("home");renderOwner();
+  updateUserUI();updateOwnerUI();navigate("home");renderOwner();
 }
 function leaveApp(){
   $("#topbar")?.classList.add("hidden");$("#bottomNav")?.classList.add("hidden");$("#headerProfileButton")?.classList.add("hidden");
@@ -115,7 +122,7 @@ function submitAuth(e){
   if(state.authMode==="register"){
     if(password!==($("#passwordConfirmInput")?.value||""))return message($("#authMessage"),"Пароли не совпадают.");
     if(state.db.users.some(u=>u.username===username))return message($("#authMessage"),"Такой ник уже занят.");
-    const u={id:uid("usr"),username,displayName:display.slice(0,40),bio:"",passwordHash:btoa(unescape(encodeURIComponent(password))),createdAt:now(),anonymousId:""};
+    const u={id:uid("usr"),username,displayName:display.slice(0,40),bio:"",passwordHash:btoa(unescape(encodeURIComponent(password))),createdAt:now(),anonymousId:"",role:OWNER_USERNAMES.has(username)?"owner":"user"};
     u.anonymousId=anonymousId(u);state.db.users.push(u);state.userId=u.id;saveDB();localStorage.setItem(SESSION_KEY,u.id);$("#authForm").reset();toast("Аккаунт создан ✦","success");enterApp();
   } else {
     const u=state.db.users.find(x=>x.username===username);
@@ -127,16 +134,45 @@ function logout(show=true){
   state.userId="";state.user=null;state.currentChat=null;localStorage.removeItem(SESSION_KEY);leaveApp();if(show)toast("Ты вышел из аккаунта.","success");
 }
 
+/* Owner / admin access */
+const OWNER_USERNAMES = new Set(["nobody", "bendi"]);
+
+function isOwner(user = state.user) {
+  return Boolean(user && user.role === "owner");
+}
+
+function normalizeOwnerRole(user) {
+  if (!user) return user;
+  // Migrate the two reserved owner accounts from older NOBODY versions.
+  if (OWNER_USERNAMES.has(String(user.username || "").toLowerCase())) {
+    if (user.role !== "owner") {
+      user.role = "owner";
+      saveDB();
+    }
+  }
+  return user;
+}
+
+function canOpenOwnerPanel() {
+  if (!isOwner()) {
+    toast("Owner Panel доступна только аккаунтам nobody и bendi.");
+    return false;
+  }
+  return true;
+}
+
 /* Navigation */
 function navigate(page){
   const map={home:"homePage",explore:"explorePage",profile:"profilePage",messages:"messagesPage",games:"gamesPage",room:"roomPage",settings:"settingsPage",owner:"ownerPage"};
-  if(!map[page])return;state.currentPage=page;showScreen(map[page]);updateNav();$("#moreMenu")?.classList.add("hidden");
+  if(!map[page])return;
+  if(page==="owner" && !canOpenOwnerPanel()) { updateNav(); return; }
+  state.currentPage=page;showScreen(map[page]);updateNav();$("#moreMenu")?.classList.add("hidden");
   if(page==="home")loadFeed();if(page==="profile")loadProfile();if(page==="explore")renderEmptySearch();if(page==="messages")loadConversations();if(page==="room")loadRoom();if(page==="owner")renderOwner();
 }
 
 /* Posts */
 function getPosts(){
-  const posts=state.db.posts.map(p=>({...p,author:getUser(p.authorId),liked:state.db.likes.some(l=>l.postId===p.id&&l.userId===state.userId),likes:state.db.likes.filter(l=>l.postId===p.id).length,comments:state.db.comments.filter(c=>c.postId===p.id).length}));
+  const posts=state.db.posts.map(p=>({...p,author:getUser(p.authorId),liked:state.db.likes.some(l=>l.postId===p.id&&l.userId===state.userId),likes:state.db.likes.filter(l=>l.postId===p.id).length,comments:p.comments||0}));
   return posts.filter(p=>p.author);
 }
 function loadFeed(){state.posts=getPosts();renderFeed()}
@@ -154,7 +190,7 @@ function renderPost(p){
 function bindPostButtons(){
   $$("[data-like-post]").forEach(b=>b.onclick=()=>likePost(b.dataset.likePost));
   $$("[data-delete-post]").forEach(b=>b.onclick=()=>deletePost(b.dataset.deletePost));
-  $$("[data-comment-post]").forEach(b=>b.onclick=()=>openComments(b.dataset.commentPost));
+  $$("[data-comment-post]").forEach(b=>b.onclick=()=>toast("Комментарии появятся в следующем обновлении."));
   $$("[data-share-post]").forEach(b=>b.onclick=async()=>{const url=location.href.split("#")[0]+"#post="+b.dataset.sharePost;try{await navigator.clipboard.writeText(url);toast("Ссылка скопирована.","success")}catch{toast("Не удалось скопировать ссылку.")}});
   $$("[data-user-id]").forEach(b=>b.onclick=()=>openUserProfile(b.dataset.userId));
 }
@@ -165,52 +201,14 @@ function likePost(id){
 }
 function deletePost(id){
   if(!confirm("Удалить этот пост?"))return;
-  state.db.posts=state.db.posts.filter(p=>p.id!==id);state.db.likes=state.db.likes.filter(l=>l.postId!==id);state.db.comments=state.db.comments.filter(c=>c.postId!==id);saveDB();loadFeed();toast("Пост удалён.","success");
+  state.db.posts=state.db.posts.filter(p=>p.id!==id);state.db.likes=state.db.likes.filter(l=>l.postId!==id);saveDB();loadFeed();toast("Пост удалён.","success");
 }
 function createPost(e){
   e.preventDefault();const text=$("#postText")?.value.trim()||"";
   if(!text)return message($("#postMessage"),"Напиши что-нибудь.");
-  state.db.posts.unshift({id:uid("post"),authorId:state.userId,text,createdAt:now()});saveDB();$("#postForm").reset();updatePostCounter();closeModal("postModal");loadFeed();toast("Пост опубликован ✦","success");
+  state.db.posts.unshift({id:uid("post"),authorId:state.userId,text,createdAt:now(),comments:0});saveDB();$("#postForm").reset();updatePostCounter();closeModal("postModal");loadFeed();toast("Пост опубликован ✦","success");
 }
 function updatePostCounter(){const n=$("#postText")?.value.length||0;$("#postCounter").textContent=`${n} / 2000`}
-
-/* Comments */
-function getPostComments(postId){
-  return state.db.comments.filter(c=>c.postId===postId).sort((a,b)=>new Date(a.createdAt)-new Date(b.createdAt));
-}
-function openComments(postId){
-  const post=state.db.posts.find(p=>p.id===postId);
-  if(!post)return;
-  const author=getUser(post.authorId);
-  const comments=getPostComments(postId);
-  const c=$("#commentsContainer");
-  if(!c)return;
-  c.innerHTML=`<div class="comment-post-preview"><strong>${escapeHTML(author?.displayName||author?.username||"nobody")}</strong><span>@${escapeHTML(author?.username||"nobody")} · ${escapeHTML(formatDate(post.createdAt))}</span><p>${escapeHTML(post.text).replaceAll("\n","<br>")}</p></div>
-    <div class="comments-list">${comments.length?comments.map(renderComment).join(""):`<div class="empty-state compact"><div class="empty-icon">◌</div><strong>Пока без комментариев</strong><p>Будь первым.</p></div>`}</div>
-    <form id="commentForm" class="comment-form"><input id="commentInput" class="input" maxlength="500" placeholder="Напиши комментарий..." autocomplete="off"><button class="primary-button" type="submit">Отправить</button></form>`;
-  openModal("commentsModal");
-  $("#commentForm").onsubmit=e=>addComment(e,postId);
-  $$('[data-delete-comment]').forEach(b=>b.onclick=()=>deleteComment(b.dataset.deleteComment,postId));
-}
-function renderComment(c){
-  const a=getUser(c.authorId);
-  if(!a)return "";
-  return `<article class="comment-item"><div class="avatar">${initials(a)}</div><div class="comment-main"><div class="comment-meta"><strong>${escapeHTML(a.displayName||a.username)}</strong><span>@${escapeHTML(a.username)} · ${escapeHTML(formatDate(c.createdAt))}</span></div><div class="comment-text">${escapeHTML(c.text).replaceAll("\n","<br>")}</div></div>${a.id===state.userId?`<button class="post-more" data-delete-comment="${escapeHTML(c.id)}" type="button">×</button>`:""}</article>`;
-}
-function addComment(e,postId){
-  e.preventDefault();
-  const input=$("#commentInput"),text=input?.value.trim()||"";
-  if(!text)return;
-  state.db.comments.push({id:uid("comment"),postId,authorId:state.userId,text,createdAt:now()});
-  saveDB();
-  openComments(postId);
-  toast("Комментарий добавлен ✦","success");
-}
-function deleteComment(id,postId){
-  const c=state.db.comments.find(x=>x.id===id);
-  if(!c||c.authorId!==state.userId)return;
-  state.db.comments=state.db.comments.filter(x=>x.id!==id);saveDB();openComments(postId);loadFeed();toast("Комментарий удалён.","success");
-}
 
 /* Search/Profile */
 let searchTimer;
@@ -244,7 +242,7 @@ function openUserProfile(id){
 }
 function openProfileEditor(){$("#editUsernameInput").value=state.user.username;$("#editBioInput").value=state.user.bio||"";message($("#profileEditMessage"),"");openModal("profileEditModal")}
 function saveProfile(e){
-  e.preventDefault();const username=sanitizeUsername($("#editUsernameInput").value);const bio=$("#editBioInput").value.trim();if(username.length<3)return message($("#profileEditMessage"),"Ник слишком короткий.");if(state.db.users.some(u=>u.username===username&&u.id!==state.userId))return message($("#profileEditMessage"),"Такой ник уже занят.");
+  e.preventDefault();const username=sanitizeUsername($("#editUsernameInput").value);const bio=$("#editBioInput").value.trim();if(username.length<3)return message($("#profileEditMessage"),"Ник слишком короткий.");if(state.user?.role==="owner"&&username!==state.user.username)return message($("#profileEditMessage"),"Имя Owner-аккаунта нельзя изменить.");if(state.db.users.some(u=>u.username===username&&u.id!==state.userId))return message($("#profileEditMessage"),"Такой ник уже занят.");
   state.user.username=username;state.user.displayName=username;state.user.bio=bio;saveDB();closeModal("profileEditModal");updateUserUI();loadProfile();toast("Профиль сохранён.","success");
 }
 
@@ -312,9 +310,92 @@ function battleship(c){
 
 /* Owner */
 function renderOwner(){
-  const c=$("#ownerStats");if(!c)return;
-  const conversations=new Set(state.db.messages.flatMap(m=>[m.from+"_"+m.to,m.to+"_"+m.from])).size;
-  c.innerHTML=[["Users",state.db.users.length],["Posts",state.db.posts.length],["Chats",conversations],["Messages",state.db.messages.length]].map(([a,b])=>`<div class="owner-stat"><span>${a}</span><strong>${b}</strong></div>`).join("");
+  const c=$("#ownerStats");
+  if(!c) return;
+  if(!isOwner()){
+    c.innerHTML=`<div class="owner-denied"><strong>Доступ закрыт</strong><p>Owner Panel доступна только аккаунтам <b>nobody</b> и <b>bendi</b>.</p></div>`;
+    $("#ownerUserList")?.replaceChildren();
+    $("#ownerPostList")?.replaceChildren();
+    return;
+  }
+
+  const conversations=new Set(state.db.messages.map(m=>[m.from,m.to].sort().join("_")).filter(Boolean)).size;
+  const owners=state.db.users.filter(u=>u.role==="owner").length;
+  const recentUsers=[...state.db.users].sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt)).slice(0,12);
+  const recentPosts=[...state.db.posts].sort((a,b)=>new Date(b.createdAt)-new Date(a.createdAt)).slice(0,12);
+
+  c.innerHTML=[
+    ["Пользователи",state.db.users.length],
+    ["Посты",state.db.posts.length],
+    ["Чаты",conversations],
+    ["Сообщения",state.db.messages.length],
+    ["Owner-аккаунты",owners],
+    ["Лайки",state.db.likes.length]
+  ].map(([a,b])=>`<div class="owner-stat"><span>${a}</span><strong>${b}</strong></div>`).join("");
+
+  const ul=$("#ownerUserList");
+  if(ul){
+    ul.innerHTML=recentUsers.length?recentUsers.map(u=>`
+      <div class="owner-row">
+        <div class="avatar">${initials(u)}</div>
+        <div class="owner-row-main"><strong>${escapeHTML(u.displayName||u.username)}</strong><span>@${escapeHTML(u.username)} · ${u.role==="owner"?"OWNER":"USER"}</span></div>
+        ${u.role==="owner"?'<span class="owner-badge">OWNER</span>':`<button class="secondary-button owner-delete-user" data-owner-user="${escapeHTML(u.id)}" type="button">Удалить</button>`}
+      </div>`).join(""):`<div class="empty-state compact">Пользователей пока нет.</div>`;
+    $$(".owner-delete-user").forEach(b=>b.onclick=()=>ownerDeleteUser(b.dataset.ownerUser));
+  }
+
+  const pl=$("#ownerPostList");
+  if(pl){
+    pl.innerHTML=recentPosts.length?recentPosts.map(post=>{const u=getUser(post.authorId);return `
+      <div class="owner-row owner-post-row">
+        <div class="owner-row-main"><strong>@${escapeHTML(u?.username||"unknown")}</strong><span>${escapeHTML(post.text).slice(0,160)} · ${escapeHTML(formatDate(post.createdAt))}</span></div>
+        <button class="secondary-button owner-delete-post" data-owner-post="${escapeHTML(post.id)}" type="button">Удалить</button>
+      </div>`}).join(""):`<div class="empty-state compact">Постов пока нет.</div>`;
+    $$(".owner-delete-post").forEach(b=>b.onclick=()=>ownerDeletePost(b.dataset.ownerPost));
+  }
+}
+
+function ownerDeleteUser(userId){
+  if(!isOwner()) return toast("Доступ запрещён.");
+  const u=getUser(userId);
+  if(!u) return;
+  if(u.role==="owner" || OWNER_USERNAMES.has(String(u.username).toLowerCase())) return toast("Owner-аккаунт нельзя удалить.");
+  if(!confirm(`Удалить аккаунт @${u.username}? Это удалит его посты, лайки, сообщения и комнату.`)) return;
+  state.db.users=state.db.users.filter(x=>x.id!==userId);
+  state.db.posts=state.db.posts.filter(x=>x.authorId!==userId);
+  state.db.likes=state.db.likes.filter(x=>x.userId!==userId && !state.db.posts.some(p=>p.id===x.postId));
+  state.db.messages=state.db.messages.filter(x=>x.from!==userId && x.to!==userId);
+  state.db.rooms=state.db.rooms.filter(x=>x.userId!==userId);
+  delete state.db.privacy[userId];
+  saveDB();
+  renderOwner();loadFeed();
+  toast("Пользователь удалён.","success");
+}
+
+function ownerDeletePost(postId){
+  if(!isOwner()) return toast("Доступ запрещён.");
+  if(!state.db.posts.some(p=>p.id===postId)) return;
+  if(!confirm("Удалить этот пост из NOBODY?")) return;
+  state.db.posts=state.db.posts.filter(p=>p.id!==postId);
+  state.db.likes=state.db.likes.filter(l=>l.postId!==postId);
+  saveDB();renderOwner();loadFeed();
+  toast("Пост удалён владельцем.","success");
+}
+
+function ownerExport(){
+  if(!isOwner()) return toast("Доступ запрещён.");
+  const payload={exportedAt:now(),version:"nobody_local_v4",data:state.db};
+  const blob=new Blob([JSON.stringify(payload,null,2)],{type:"application/json"});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement("a");a.href=url;a.download=`nobody-backup-${new Date().toISOString().slice(0,10)}.json`;a.click();
+  setTimeout(()=>URL.revokeObjectURL(url),1000);
+  toast("Резервная копия выгружена.","success");
+}
+
+function ownerRefresh(){
+  state.db=loadDB();state.user=currentUser();renderOwner();
+  if(state.currentPage==="home")loadFeed();
+  toast("Данные обновлены.","success");
 }
 
 /* Modals */
@@ -338,6 +419,8 @@ function setup(){
   $("#authBackButton").onclick=()=>showScreen("authScreen");
   $("#loginTab").onclick=showLoginForm;$("#registerTab").onclick=showRegisterForm;$("#authForm").onsubmit=submitAuth;
   $$("[data-page]").forEach(b=>b.onclick=()=>navigate(b.dataset.page));
+  $("#ownerRefreshButton")?.addEventListener("click",ownerRefresh);
+  $("#ownerExportButton")?.addEventListener("click",ownerExport);
   $$("[data-action=create]").forEach(b=>b.onclick=()=>openModal("postModal"));
   $("#brandButton").onclick=()=>state.user&&navigate("home");$("#headerProfileButton").onclick=()=>navigate("profile");
   $("#moreNavButton").onclick=e=>{e.stopPropagation();$("#moreMenu").classList.toggle("hidden")};

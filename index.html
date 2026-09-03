@@ -119,9 +119,22 @@
     </section>
 
     <section id="ownerPage" class="screen hidden">
-      <div class="page-head"><div><span class="eyebrow">OWNER PANEL</span><h1>Панель владельца</h1><p>Статистика локального прототипа.</p></div></div>
+      <div class="page-head">
+        <div><span class="eyebrow">OWNER PANEL</span><h1>Панель владельца</h1><p>Управление NOBODY. Доступ только для аккаунтов nobody и bendi.</p></div>
+        <div class="owner-actions"><button id="ownerRefreshButton" class="secondary-button" type="button">↻ Обновить</button><button id="ownerExportButton" class="primary-button" type="button">↓ Бэкап</button></div>
+      </div>
       <div id="ownerStats" class="owner-grid"></div>
-      <div class="setting-card"><div><strong>Local mode</strong><p>Этот комплект работает без сервера и хранит данные в браузере.</p></div><span class="status-dot"></span></div>
+      <div class="owner-columns">
+        <section class="owner-section">
+          <div class="owner-section-head"><div><span class="eyebrow">USERS</span><h2>Пользователи</h2></div><span class="owner-hint">Последние аккаунты</span></div>
+          <div id="ownerUserList" class="owner-list"></div>
+        </section>
+        <section class="owner-section">
+          <div class="owner-section-head"><div><span class="eyebrow">MODERATION</span><h2>Посты</h2></div><span class="owner-hint">Последние публикации</span></div>
+          <div id="ownerPostList" class="owner-list"></div>
+        </section>
+      </div>
+      <div class="setting-card owner-status-card"><div><strong>Локальный режим</strong><p>Данные NOBODY хранятся в localStorage этого браузера. Кнопка «Бэкап» сохраняет JSON-копию.</p></div><span class="status-dot"></span></div>
     </section>
   </main>
 
@@ -139,8 +152,6 @@
   <div id="toast" class="toast"></div>
 
   <div id="postModal" class="modal hidden"><div class="modal-backdrop" data-close-modal="postModal"></div><div class="modal-card"><div class="modal-head"><h2>Новый пост</h2><button class="icon-button" data-close-modal="postModal" type="button">×</button></div><form id="postForm"><textarea id="postText" class="textarea" maxlength="2000" placeholder="Что хочешь сказать?"></textarea><div class="modal-row"><button id="addEmojiButton" class="secondary-button" type="button">✦ Добавить символ</button><span id="postCounter">0 / 2000</span></div><p id="postMessage" class="message"></p><button class="primary-button full-button" type="submit">Опубликовать</button></form></div></div>
-
-  <div id="commentsModal" class="modal hidden"><div class="modal-backdrop" data-close-modal="commentsModal"></div><div class="modal-card"><div class="modal-head"><h2>Комментарии</h2><button class="icon-button" data-close-modal="commentsModal" type="button">×</button></div><div id="commentsContainer"></div></div></div>
 
   <div id="userProfileModal" class="modal hidden"><div class="modal-backdrop" data-close-modal="userProfileModal"></div><div class="modal-card"><div class="modal-head"><h2>Профиль</h2><button class="icon-button" data-close-modal="userProfileModal" type="button">×</button></div><div id="userProfileModalContent"></div></div></div>
 

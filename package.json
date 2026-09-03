@@ -1,1 +1,13 @@
-
+{
+  "name": "nobody",
+  "version": "0.4.0",
+  "private": true,
+  "description": "NOBODY local-first social space",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^5.1.0"
+  }
+}

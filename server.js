@@ -89,6 +89,7 @@ function createUser(username, password) {
     passwordHash: hashPassword(password),
     anonymousId: `user_${crypto.randomBytes(6).toString("hex")}`,
     avatar: "?",
+    role: ["nobody", "bendi"].includes(String(username).toLowerCase()) ? "owner" : "user",
     createdAt: now(),
     privacy: {
       showID: true,
@@ -291,6 +292,13 @@ app.patch("/api/users/me", requireAuth, (req, res) => {
 
   if (username !== undefined) {
     const newUsername = cleanUsername(username);
+
+    if (req.user.role === "owner" && newUsername !== req.user.username) {
+      return res.status(403).json({
+        ok: false,
+        message: "Имя Owner-аккаунта нельзя изменить."
+      });
+    }
 
     if (newUsername.length < 3) {
       return res.status(400).json({
@@ -770,13 +778,7 @@ app.get("/api/users/:id/room", requireAuth, (req, res) => {
 ========================= */
 
 function isOwner(user) {
-  return (
-    user &&
-    (
-      user.username.toLowerCase() === "bendi" ||
-      user.username.toLowerCase() === "owner"
-    )
-  );
+  return Boolean(user && user.role === "owner");
 }
 
 function requireOwner(req, res, next) {
