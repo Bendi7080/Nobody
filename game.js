@@ -30,9 +30,9 @@ function now(){ return new Date().toISOString(); }
 function loadDB(){
   try {
     const raw = localStorage.getItem(DB_KEY);
-    if(raw) return JSON.parse(raw);
+    if(raw) { const db=JSON.parse(raw); db.comments=Array.isArray(db.comments)?db.comments:[]; return db; }
   } catch {}
-  return {users:[],posts:[],likes:[],messages:[],rooms:[],privacy:{},sessions:[]};
+  return {users:[],posts:[],likes:[],comments:[],messages:[],rooms:[],privacy:{},sessions:[]};
 }
 function saveDB(){ localStorage.setItem(DB_KEY, JSON.stringify(state.db)); }
 function escapeHTML(v){
@@ -136,7 +136,7 @@ function navigate(page){
 
 /* Posts */
 function getPosts(){
-  const posts=state.db.posts.map(p=>({...p,author:getUser(p.authorId),liked:state.db.likes.some(l=>l.postId===p.id&&l.userId===state.userId),likes:state.db.likes.filter(l=>l.postId===p.id).length,comments:p.comments||0}));
+  const posts=state.db.posts.map(p=>({...p,author:getUser(p.authorId),liked:state.db.likes.some(l=>l.postId===p.id&&l.userId===state.userId),likes:state.db.likes.filter(l=>l.postId===p.id).length,comments:state.db.comments.filter(c=>c.postId===p.id).length}));
   return posts.filter(p=>p.author);
 }
 function loadFeed(){state.posts=getPosts();renderFeed()}
@@ -154,7 +154,7 @@ function renderPost(p){
 function bindPostButtons(){
   $$("[data-like-post]").forEach(b=>b.onclick=()=>likePost(b.dataset.likePost));
   $$("[data-delete-post]").forEach(b=>b.onclick=()=>deletePost(b.dataset.deletePost));
-  $$("[data-comment-post]").forEach(b=>b.onclick=()=>toast("Комментарии появятся в следующем обновлении."));
+  $$("[data-comment-post]").forEach(b=>b.onclick=()=>openComments(b.dataset.commentPost));
   $$("[data-share-post]").forEach(b=>b.onclick=async()=>{const url=location.href.split("#")[0]+"#post="+b.dataset.sharePost;try{await navigator.clipboard.writeText(url);toast("Ссылка скопирована.","success")}catch{toast("Не удалось скопировать ссылку.")}});
   $$("[data-user-id]").forEach(b=>b.onclick=()=>openUserProfile(b.dataset.userId));
 }
@@ -165,14 +165,52 @@ function likePost(id){
 }
 function deletePost(id){
   if(!confirm("Удалить этот пост?"))return;
-  state.db.posts=state.db.posts.filter(p=>p.id!==id);state.db.likes=state.db.likes.filter(l=>l.postId!==id);saveDB();loadFeed();toast("Пост удалён.","success");
+  state.db.posts=state.db.posts.filter(p=>p.id!==id);state.db.likes=state.db.likes.filter(l=>l.postId!==id);state.db.comments=state.db.comments.filter(c=>c.postId!==id);saveDB();loadFeed();toast("Пост удалён.","success");
 }
 function createPost(e){
   e.preventDefault();const text=$("#postText")?.value.trim()||"";
   if(!text)return message($("#postMessage"),"Напиши что-нибудь.");
-  state.db.posts.unshift({id:uid("post"),authorId:state.userId,text,createdAt:now(),comments:0});saveDB();$("#postForm").reset();updatePostCounter();closeModal("postModal");loadFeed();toast("Пост опубликован ✦","success");
+  state.db.posts.unshift({id:uid("post"),authorId:state.userId,text,createdAt:now()});saveDB();$("#postForm").reset();updatePostCounter();closeModal("postModal");loadFeed();toast("Пост опубликован ✦","success");
 }
 function updatePostCounter(){const n=$("#postText")?.value.length||0;$("#postCounter").textContent=`${n} / 2000`}
+
+/* Comments */
+function getPostComments(postId){
+  return state.db.comments.filter(c=>c.postId===postId).sort((a,b)=>new Date(a.createdAt)-new Date(b.createdAt));
+}
+function openComments(postId){
+  const post=state.db.posts.find(p=>p.id===postId);
+  if(!post)return;
+  const author=getUser(post.authorId);
+  const comments=getPostComments(postId);
+  const c=$("#commentsContainer");
+  if(!c)return;
+  c.innerHTML=`<div class="comment-post-preview"><strong>${escapeHTML(author?.displayName||author?.username||"nobody")}</strong><span>@${escapeHTML(author?.username||"nobody")} · ${escapeHTML(formatDate(post.createdAt))}</span><p>${escapeHTML(post.text).replaceAll("\n","<br>")}</p></div>
+    <div class="comments-list">${comments.length?comments.map(renderComment).join(""):`<div class="empty-state compact"><div class="empty-icon">◌</div><strong>Пока без комментариев</strong><p>Будь первым.</p></div>`}</div>
+    <form id="commentForm" class="comment-form"><input id="commentInput" class="input" maxlength="500" placeholder="Напиши комментарий..." autocomplete="off"><button class="primary-button" type="submit">Отправить</button></form>`;
+  openModal("commentsModal");
+  $("#commentForm").onsubmit=e=>addComment(e,postId);
+  $$('[data-delete-comment]').forEach(b=>b.onclick=()=>deleteComment(b.dataset.deleteComment,postId));
+}
+function renderComment(c){
+  const a=getUser(c.authorId);
+  if(!a)return "";
+  return `<article class="comment-item"><div class="avatar">${initials(a)}</div><div class="comment-main"><div class="comment-meta"><strong>${escapeHTML(a.displayName||a.username)}</strong><span>@${escapeHTML(a.username)} · ${escapeHTML(formatDate(c.createdAt))}</span></div><div class="comment-text">${escapeHTML(c.text).replaceAll("\n","<br>")}</div></div>${a.id===state.userId?`<button class="post-more" data-delete-comment="${escapeHTML(c.id)}" type="button">×</button>`:""}</article>`;
+}
+function addComment(e,postId){
+  e.preventDefault();
+  const input=$("#commentInput"),text=input?.value.trim()||"";
+  if(!text)return;
+  state.db.comments.push({id:uid("comment"),postId,authorId:state.userId,text,createdAt:now()});
+  saveDB();
+  openComments(postId);
+  toast("Комментарий добавлен ✦","success");
+}
+function deleteComment(id,postId){
+  const c=state.db.comments.find(x=>x.id===id);
+  if(!c||c.authorId!==state.userId)return;
+  state.db.comments=state.db.comments.filter(x=>x.id!==id);saveDB();openComments(postId);loadFeed();toast("Комментарий удалён.","success");
+}
 
 /* Search/Profile */
 let searchTimer;
